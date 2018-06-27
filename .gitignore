@@ -1,0 +1,18 @@
+
+/target
+**/*.rs.bk
+
+# graph output
+__pycache__
+graph
+*.dot
+*.gml
+*.graphml
+*.ps
+*.html
+
+# config files
+*.ron
+
+matrixgraph/target
+matrixgraph/Cargo.lock

@@ -1,0 +1,144 @@
+/* simplified derivative of my css-grids theme */
+
+* {
+    box-sizing: border-box;
+}
+
+:root {
+    /* works in Edge since Windosw 10 1506, but not IE11 */
+    --font-sans: 'Noto Sans', 'sans-serif';
+    --font-serif: 'Noto Serif', 'serif';
+    --font-monospace: 'Hack', 'monospace';
+
+    /** SOLARIZED **/
+    /* Background Tones */
+    --base03:    #002b36;
+    --base02:    #073642;
+    /* Content Tones */
+    --base01:    #586e75;
+    --base00:    #657b83;
+    --base0:     #839496;
+    --base1:     #93a1a1;
+    /* Background Tones */
+    --base2:     #eee8d5;
+    --base3:     #fdf6e3;
+    /* Accent Colors */
+    --yellow:    #b58900;
+    --orange:    #cb4b16;
+    --red:       #dc322f;
+    --magenta:   #d33682;
+    --violet:    #6c71c4;
+    --blue:      #268bd2;
+    --cyan:      #2aa198;
+    --green:     #859900;
+    /* dark color scheme */
+    /* emphasized content color is optional */
+    --content_emphasized: var(--base1);
+    --content_primary: var(--base0);
+    --content_secondary: var(--base01);
+    --background_highlights: var(--base02);
+    --background: var(--base03);
+    /* light color scheme */
+    /* emphasized content color is optional */
+    --content_emphasized: var(--base01);
+    --content_primary: var(--base00);
+    --content_secondary: var(--base1);
+    --background_highlights: var(--base2);
+    --background: var(--base3);
+    /*
+     * The contrast between content_primary and background is the same as between content_emphasized and
+     * background_highlights. Switch to that combination when something is highlighted, e.g. a code block or a quote in
+     * a text.
+     *
+     * content_secondary can only be used on background, use it to differentiate something from content_primary which is
+     * less important, as it has less contrast to background. content_secondary on background_highlights is even less
+     * important.
+     */
+    --accent: var(--green);
+}
+
+body {
+    /* browser defaults to 8px, removing because footer & header should go to left and right end */
+    /* http://trac.webkit.org/browser/trunk/Source/WebCore/css/html.css */
+    /* https://hg.mozilla.org/mozilla-central/file/tip/layout/style/res/html.css */
+    margin: 0;
+    color: var(--content_primary);
+    background-color: var(--background);
+    /* force vertical scroll bar */
+    overflow-y: scroll;
+}
+
+::-moz-selection{ background: var(--magenta); color: var(--background); }
+::selection { background: var(--magenta); color: var(--background); }
+
+#main-header, nav, main, aside, #main-footer {
+    /* stop h1 margin from collapsing with header (non-existent) margin  */
+    /* makes sense for all grid elements, but care needs to be taken if things vanish that should not… */
+    /* http://www.seifi.org/css/understanding-taming-collapsing-margins-in-css.html */
+    overflow: hidden;
+    /* redo ~8px body element margin, but in a way so that header and footer can reach to left and right */
+    padding: 0 0.5rem;
+}
+#main-header, nav, main, aside, #main-footer {
+    /* don't increase text width forever. 50rem is about 100chars */
+    max-width: 50rem;
+}
+
+#main-header, nav, main, aside, #main-footer {
+    /* center content boxes horizontally in grid area and when linear */
+    /* >50rem but <80rem and too small for gridding */
+    /* problem: aside will stay centered when gridded */
+    margin-left: auto;
+    margin-right: auto;
+}
+
+
+a {
+    color: var(--accent);
+    /* font-weight: bold; */
+}
+
+a:focus, a:hover {
+    background-color: var(--accent);
+    color: var(--background_highlights);
+}
+
+
+blockquote, body, cite, q {
+    font-family: var(--font-sans);
+}
+
+p {
+    font-family: var(--font-serif);
+    /* hyphens: auto needs ms and webkit prefixes, and is badly supported in Chrome */
+    /* or: use hyphenator */
+    text-align:justify;
+    hyphens: auto;
+    /* Increase from 1.1 from normalize.css - http://practicaltypography.com/line-spacing.html */
+    line-height: 1.35;
+
+    /* 1ch ~ 1.2 characters in a variable space font */
+    /* case main: add space for padding / borders via calc as we use border-box */
+    /* case p: what's with other elements in main then? */
+    /* assign that to p vs assign that to main? */
+    /* best seems to be ~100 resulting characters. */
+    /* IE uses 0 without spacing and is therefore shorter */
+    /* 1ch ~= 0.5em */
+    /*  https://zellwk.com/blog/rem-vs-em */
+    /* 1. Size in em if the property scales according to it’s (bzw. the elemenent's) font-size */
+    /* 2. Size everything else in rem. */
+    /* weiteres ch-Problem: es gibt keine rch, da kann ich eigentlich auch gleich em benutzen und Faktor 2 rechnen */
+    /* max-width: 50em; */
+}
+
+h1, h2, h3, h4, h5, h6 {
+    color: var(--accent);
+}
+
+#main-header h1 {
+    font-size: 2.5em;
+}
+#main-header h1 img {
+    height: 2em;
+    vertical-align: bottom;
+}
