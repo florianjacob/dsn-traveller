@@ -110,11 +110,13 @@ fn get_config() -> TravellerConfig {
       Ok(config) => config,
       Err(_) => {
          print!("homeserver url: ");
+         io::stdout().flush().unwrap();
          let mut homeserver_url = String::new();
          io::stdin().read_line(&mut homeserver_url).unwrap();
          let homeserver_url = Url::parse(homeserver_url.trim()).unwrap();
 
          print!("control room: ");
+         io::stdout().flush().unwrap();
          let mut control_room = String::new();
          io::stdin().read_line(&mut control_room).unwrap();
          let control_room = RoomIdOrAliasId::try_from(control_room.trim()).unwrap();
@@ -145,11 +147,13 @@ fn get_client(tokio_handle: &Handle, config: &TravellerConfig) -> impl Future<It
    async_block! {
       if needs_login {
          print!("username: ");
+         io::stdout().flush().unwrap();
          let mut username = String::new();
          io::stdin().read_line(&mut username).unwrap();
          let username = String::from(username.trim());
 
          print!("password: ");
+         io::stdout().flush().unwrap();
          let mut password = String::new();
          io::stdin().read_line(&mut password).unwrap();
          let password = String::from(password.trim());
