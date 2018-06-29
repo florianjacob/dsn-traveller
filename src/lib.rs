@@ -87,17 +87,17 @@ fn randomize_txnid(txn_id: &mut AtomicUsize) {
 pub fn send_message<C: Connect>(client: Client<C>, room_id: RoomId, message: String) -> Result<EventId, ruma_client::Error> {
     use r0::send::send_message_event;
     let response = await!(send_message_event::call(
-        client.clone(),
-        send_message_event::Request {
-            room_id: room_id,
-            event_type: EventType::RoomMessage,
-            txn_id: TXN_ID.fetch_add(1, Ordering::Relaxed).to_string(),
-            data: MessageEventContent::Text(TextMessageEventContent {
-                body: message,
-                msgtype: MessageType::Text,
-            }),
-        }
-        ))?;
+            client.clone(),
+            send_message_event::Request {
+                room_id: room_id,
+                event_type: EventType::RoomMessage,
+                txn_id: TXN_ID.fetch_add(1, Ordering::Relaxed).to_string(),
+                data: MessageEventContent::Text(TextMessageEventContent {
+                    body: message,
+                    msgtype: MessageType::Text,
+                }),
+            }
+            ))?;
     Ok(response.event_id)
 }
 
@@ -351,7 +351,7 @@ fn room_members<C: Connect>(client: Client<C>, room_id: RoomId) -> Result<Vec<St
     let response = await!(get_member_events::call(
             client.clone(),
             get_member_events::Request {
-            room_id: room_id.clone(),
+                room_id: room_id.clone(),
             }))?;
 
     // in the case of join membership events it's probably always the case that sender is the same user
