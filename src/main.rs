@@ -33,7 +33,6 @@ use clap::{Arg, App, SubCommand};
 
 use url::Url;
 use futures::prelude::*;
-use futures::future::ok;
 use ruma_client::{Client, Session};
 use ruma_identifiers::{RoomAliasId, RoomIdOrAliasId, UserId};
 use tokio_core::reactor::{Core, Handle};
@@ -171,11 +170,11 @@ fn get_client(tokio_handle: &Handle, config: &TravellerConfig) -> impl Future<It
 fn join(
    tokio_handle: Handle,
    room_list: Vec<String>,
-   ) -> Box<Future<Item = (), Error = ruma_client::Error>> {
+   ) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
 
    let config = get_config();
 
-   let future = async_block! {
+   async_block! {
       let client = await!(get_client(&tokio_handle, &config))?;
 
       let room_aliases = Vec::from_iter(room_list.into_iter()
@@ -195,17 +194,16 @@ fn join(
       eprintln!("{}", message);
 
       Ok(())
-   };
-   Box::new(future)
+   }
 }
 
 fn crawl(
    tokio_handle: Handle,
-   ) -> Box<Future<Item = (), Error = ruma_client::Error>> {
+   ) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
 
    let config = get_config();
 
-   let future = async_block! {
+   async_block! {
       let client = await!(get_client(&tokio_handle, &config))?;
 
       let (room_count, user_count, server_count) = await!(dsn_traveller::crawl(client.clone()))?;
@@ -221,17 +219,16 @@ fn crawl(
       eprintln!("{}", message);
 
       Ok(())
-   };
-   Box::new(future)
+   }
 }
 
 fn leave(
    tokio_handle: Handle,
-   ) -> Box<Future<Item = (), Error = ruma_client::Error>> {
+   ) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
 
    let config = get_config();
 
-   let future = async_block! {
+   async_block! {
       let client = await!(get_client(&tokio_handle, &config))?;
 
       let control_room_id = await!(dsn_traveller::into_room_id(client.clone(), config.control_room.clone())).expect("Could not resolve control room alias");
@@ -246,8 +243,7 @@ fn leave(
       eprintln!("{}", message);
 
       Ok(())
-   };
-   Box::new(future)
+   }
 }
 
 
@@ -279,29 +275,38 @@ fn main() {
       .get_matches();
 
    let mut core = Core::new().unwrap();
+   let handle = core.handle().clone();
 
-   let future = match matches.subcommand() {
-      ("join", Some(join_matches)) => {
-         let room_list: Vec<String> = if join_matches.is_present("stdin") {
-            let stdin = io::stdin();
-            let lines = stdin.lock().lines().map(|line| line.unwrap());
-            Vec::from_iter(lines)
-         } else {
-            match join_matches.values_of("room_aliases") {
-               Some(aliases) => Vec::from_iter(aliases.map(|s| s.to_string())),
-               None => Vec::new(),
-            }
-         };
+   let future = async_block! {
+      match matches.subcommand() {
+         ("join", Some(_)) => {
+            let room_list: Vec<String> = {
+               // would need non-lexical lifetimes to use the ("join", Some(join_matches))
+               // as that borrow will not end before the await, running in a
+               // "borrow may still be in use when generator yields"
+               let join_matches = matches.subcommand_matches("join").unwrap();
+                if join_matches.is_present("stdin") {
+                  let stdin = io::stdin();
+                  let lines = stdin.lock().lines().map(|line| line.unwrap());
+                  Vec::from_iter(lines)
+               } else {
+                  match join_matches.values_of("room_aliases") {
+                     Some(aliases) => Vec::from_iter(aliases.map(|s| s.to_string())),
+                     None => Vec::new(),
+                  }
+               }
+            };
 
-         join(core.handle().clone(), room_list)
-      },
-      ("crawl", Some(_)) => crawl(core.handle().clone()),
-      ("leave", Some(_)) => leave(core.handle().clone()),
-      ("", None) => {
-         eprintln!("No subcommand given.");
-         Box::new(ok(()))
-      },
-      _ => unreachable!(),
+            await!(join(handle, room_list))
+         },
+         ("crawl", Some(_)) => await!(crawl(handle)),
+         ("leave", Some(_)) => await!(leave(handle)),
+         ("", None) => {
+            eprintln!("No subcommand given.");
+            Ok(())
+         },
+         _ => unreachable!(),
+      }
    };
 
    core.run(future).unwrap();
