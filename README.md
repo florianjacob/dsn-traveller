@@ -1,7 +1,7 @@
 # DSN Traveller #
 ## Travelling the Matrix network, for Science! ##
-The DSN Traveller travels the Matrix network under the name of @dsn-traveller:dsn-traveller.dsn.scc.kit.edu and writes a
-travel report of what it saw. 📝
+The DSN Traveller travels the [Matrix](https://matrix.org/) network
+under the name of @dsn-traveller:dsn-traveller.dsn.scc.kit.edu and writes a travel report of what it saw. 📝
 
 [More information](https://dsn-traveller.dsn.scc.kit.edu/)
 
