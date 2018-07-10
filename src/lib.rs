@@ -397,7 +397,17 @@ pub fn crawl<C: Connect>(client: Client<C>) -> Result<(usize, usize, usize), rum
         assert!(!room_indexes.contains_key(&room));
         room_indexes.insert(room.clone(), room_node);
 
-        let members = await!(room_members(client.clone(), room.clone()))?;
+        // occasionally this resulted in a bad gateway error
+        // could not find the synapse log lines for that, but it's probably due to server overload.
+        // redoing it once worked fine.
+        let members = match await!(room_members(client.clone(), room.clone())) {
+            Ok(members) => members,
+            Err(e) => {
+                eprintln!("error getting room members: {:?}, retrying once.", e);
+                await!(room_members(client.clone(), room.clone()))?
+            },
+        };
+
         // TODO: should I try to completely ignore rooms with 2 members of which one is myself?
         // -> mainly IRC Bridge ChanServ/NickServ/… rooms
         // what about empty rooms, where only traveller (and possibly voyager, or users of
