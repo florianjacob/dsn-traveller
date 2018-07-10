@@ -424,6 +424,7 @@ pub fn crawl<C: Connect>(client: Client<C>) -> Result<(usize, usize, usize), rum
 
             let user_node = user_indexes.get(&user_id).unwrap();
             graph.add_edge(*user_node, room_node, ());
+            // connect room and the user's server in case that edge was not yet there
             let server_node = server_indexes.get(&server).unwrap();
             graph.update_edge(*server_node, room_node, ());
         }
