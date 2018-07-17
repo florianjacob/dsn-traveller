@@ -5,12 +5,14 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
+extern crate chrono;
 
 use std::io::prelude::*;
+use chrono::prelude::*;
 use std::io;
 use std::fs;
 use std::fmt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use petgraph::dot::{Dot, Config};
 use petgraph_graphml::GraphMl;
 
@@ -67,38 +69,38 @@ pub fn read_graph<P: AsRef<Path>>(path: P) -> Result<Graph, serde_json::Error> {
     serde_json::from_reader(reader)
 }
 
-pub fn write_graph(graph: &Graph) -> Result<(), serde_json::Error> {
-    let dir = Path::new("graph");
+fn graph_dir() -> PathBuf {
+    let local: DateTime<Local> = Local::now();
+    let dir = PathBuf::from(format!("data/graphs/graph_{}", local.format("%Y-%m-%dT%H-%M-%S")));
     if !dir.exists() {
-        fs::create_dir(dir).unwrap();
+        fs::create_dir_all(&dir).unwrap();
     }
+    dir
+}
 
-    let file = fs::File::create("graph/graph.json").expect("Could not create graph/graph.json file");
+pub fn write_graph(graph: &Graph) -> Result<(), serde_json::Error> {
+    let dir = graph_dir();
+
+    let file = fs::File::create(dir.join("graph.json")).expect("Could not create graph.json file");
     let writer = io::BufWriter::new(file);
     serde_json::to_writer(writer, graph)
 }
 
 pub fn export_graph_to_graphml(graph: &Graph) -> io::Result<()> {
-    let dir = Path::new("graph");
-    if !dir.exists() {
-        fs::create_dir(dir).unwrap();
-    }
+    let dir = graph_dir();
 
     let graphml = GraphMl::new(&graph).pretty_print(true).export_node_weights_display();
-    let file = fs::File::create("graph/graph.graphml").expect("Could not create graph/graph.graphml file");
+    let file = fs::File::create(dir.join("graph.graphml")).expect("Could not create graph/graph.graphml file");
     let writer = io::BufWriter::new(file);
     graphml.to_writer(writer)
 }
 
 pub fn export_graph_to_dot(graph: &Graph) -> io::Result<()> {
-    let dir = Path::new("graph");
-    if !dir.exists() {
-        fs::create_dir(dir).unwrap();
-    }
+    let dir = graph_dir();
 
     let no_edge_data = graph.map(|_, node| node.clone(), |_, _| NoEdgeData);
     let exported_graph = Dot::with_config(&no_edge_data, &[Config::EdgeNoLabel]);
-    let file = fs::File::create("graph/graph.dot").expect("Could not create graph/graph.dot file");
+    let file = fs::File::create(dir.join("graph.dot")).expect("Could not create graph/graph.dot file");
     let mut buffer = io::BufWriter::new(file);
     write!(&mut buffer, "{}", exported_graph)
 }

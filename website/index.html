@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<!--
+    Correct HTML5 sectioning: http://stackoverflow.com/a/26579514/4415604
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="lib/normalize-8.0.0.css" type="text/css" />
+    <link rel="stylesheet" href="theme/theme.css" type="text/css" />
+    <link rel=icon type=image/png href=favicon-16x16.png sizes=16x16>
+    <link rel=icon type=image/png href=favicon-32x32.png sizes=32x32>
+    <link rel=icon type=image/png href=favicon-96x96.png sizes=96x96>
+    <title>DSN Traveller</title>
+  </head>
+  <body>
+    <header id="main-header">
+      <h1 style="margin-bottom: 0.1em;"><img src="Noto_Color_Emoji_u1f4bc_briefcase.png" alt="💼" />DSN Traveller</h1>
+      <h4 style="margin-top: 0.1em; margin-bottom: 0.1em;">Travelling the Matrix network, for Science!</h4>
+    </header>
+
+    <main>
+      <article>
+        <h2>About</h2>
+        <p>
+        The DSN Traveller travels the <a href="https://matrix.org">Matrix</a> network under the name of <code>@dsn-traveller:dsn-traveller.dsn.scc.kit.edu</code>
+        and writes a travel report of what it saw. 📝
+        </p>
+        <p>
+        In case you have encountered Travis Ralston's <a href="https://voyager.t2bot.io/">Matrix Traveler Bot</a>, yes, they're quite
+        similar.
+        </p>
+
+        <h2>What's happening?</h2>
+        <p>
+        The bot makes a measurement of “how big” matrix.org and other matrix servers are,
+        and how centralized or disributed the matrix network currently is.
+        To do that, it needs to be part of many rooms, as room membership can't be queried without being in the room.
+        </p>
+        <p>
+        So first, the <code>DSN Traveller (bot)</code> will try to join all public rooms it can find.
+        This phase will probably finish around the end of May 2018.
+        </p>
+        <p>
+        The bot will then query which servers are in the rooms, and how many users are there from which servers.
+        While that is still in progress, the bot will stay in the rooms until I'm sure everything has gone right.
+        This is done to avoid needing to rejoin all rooms in case something went wrong,
+        cluttering the room histories and stressing the federation .
+        </p>
+        <p>
+        Because it anonymizes the collected data, the bot can't do partial scanning of the network by
+        joining and leaving batches of rooms.
+        The resulting data could not be merged together, and therefore the bot needs to be in all rooms at once.
+        </p>
+        <p>
+        After data gathering is finished, the bot will leave all rooms again.
+        If all goes well, this should happen by no later than the middle of June 2018.
+        </p>
+        <h2>Why does the bot stay around?</h2>
+        <p>
+        For not having to to rejoin on every adjustment I do on the data collection part of the bot.
+        After the bot development is finished, it could join all rooms, then collect data, then leave all rooms without
+        idling in between.
+        </p>
+
+        <h2>How to make the bot join a room</h2>
+        <p>
+        If you want the bot to visit you, you can invite the bot into your room.
+        As the DSN Traveller does not travel continuously, though,
+        it will not join the room immediately, but on its next trip. 💼
+        </p>
+
+        <h2>How to make the bot leave a room</h2>
+        <p>
+        If you don't want to have the Bot in your room, please pardon the inconvenience, and just throw it out! 😓
+        </p>
+        <p>
+        You can make it leave immediately by:
+        <ol>
+          <li>Kicking it (someone could still invite it back) 📤</li>
+          <li>Banning it (if you'd like it to stay gone forever) ❌</li>
+        </ol>
+        The bot does record when it gets kicked/banned and will remove any applicable nodes from the gathered data.
+        </p>
+        <p>
+        As I don't require exact data at all,
+        and an approximation to the Matrix network is sufficient for what I want to do,
+        this won't affect my research significantly.
+        </p>
+
+        <h2>Why? Who are you?</h2>
+        <p>
+        I want to find out whether the Matrix network scales, i.e. whether everything still works when the network is
+        ten times bigger, or ten times more decentralized.
+        I'm Florian Jacob, an informatics student at the
+        <a href="https://kit.edu">Karlsruhe Institute for Technology</a>,
+        and this research question is the core of my Master's thesis at the
+        <a href="https://dsn.tm.kit.edu/">Decentralized Systems and Network Services Research Group</a>. 📑
+
+        <h2>How does this work?</h2>
+        <p>
+        The DSN Traveller tries to get a rough overview of how the Matrix network is structured today. It records
+        how many rooms it finds, how many users and servers take part in those rooms, and how they relate to each other,
+        meaning how many users a server has and of how many rooms it is part of.
+        </p>
+        <p>
+        All room, server and user IDs get pseudonymized immediately after receiving them
+        using a randomly-chosen <a href="https://en.wikipedia.org/wiki/Hash_function">hash function</a> on each trip.
+        After the Traveller has finished a trip, and before storing it on disk,
+        the resulting room-server-user network is anonymized by hashing each ID together with an
+        individual random value (<a href="https://en.wikipedia.org/wiki/Salt_(cryptography)">Salt</a>) which is
+        immediately thrown away. 🧂
+        </p>
+        <p>
+        This room-server-user network observed by the DSN Traveller will be fed into my simulation of the Matrix network
+        as an anchor point to see what happens when I change the network's size and decentrality, to answer the main
+        question of my thesis.
+        </p>
+
+        <h2>Contact</h2>
+        <p>
+        Any questions? 🤔 Feel free to ask me (<code>@florian:dsn-traveller.dsn.scc.kit.edu</code>)
+        in <a href="https://matrix.to/#/#dsn-traveller:dsn-traveller.dsn.scc.kit.edu">#dsn-traveller:dsn-traveller.dsn.scc.kit.edu</a>! 💡
+        </p>
+        <p>
+        <em>
+          Note: In case you have problems joining that room, I also created the alias
+          <a href="https://matrix.to/#/#dsn-traveller:dsn-traveller.dsn.scc.kit.edu">#dsn-traveller:matrix.org</a>
+          as a workaround until the cause is found. Please try that and report any problems. If that does not work
+          either, you can also find me in <a href="https://matrix.to/#/%23Help:matrix.org">#Help:matrix.org</a> as
+          <code>@florianjacob:matrix.org</code> so we can debug this.
+        </em>
+        </p>
+
+        <h2>Source Code</h2>
+        <p>
+        The <a href="https://github.com/florianjacob/dsn-traveller">source code is available</a> under AGPLv3+.
+        </p>
+        <p>
+        The bot was written in <a href="https://rust-lang.org">Rust</a> using
+        <a href="https://github.com/ruma/ruma-client/">ruma-client</a> from the
+        <a href="https://www.ruma.io/">Ruma project</a>.
+        </p>
+
+        <h2>Research Results</h2>
+        <p>
+        After my thesis is handed in, I'll not only release the source code, but also some form of publication together
+        with the results. Presumably the thesis itself, but maybe I get the chance to write a scientific paper on the
+        results as well. 🔬
+        </p>
+        <p>
+        I won't be able to keep this website here running forever after my thesis is done,
+        but you'll hear through
+        <a href="https://matrix.to/#/%23TWIM:matrix.org">#TWIM:matrix.org</a> when and where to find the publication and
+        the results.
+        </p>
+
+        <h2>Acknowledgements</h2>
+        <p>
+          <ul>
+            <li>
+              Travis Ralston's <a href="https://voyager.t2bot.io/">Matrix Traveler Bot</a>
+              was used for getting the initial room list for the DSN Traveller.
+            </li>
+            <li>
+              Jonas Platte's <code>synapse-workaround</code> branches on his ruma forks
+              used for <a href="https://github.com/fest-im/fest">fest</a>
+              were a great help to get ruma-client and synapse to talk to each other.
+            </li>
+            <li>
+              The logo is the U+1f4bc 💼 “briefcase” emoji
+              from <a href="https://www.google.com/get/noto/help/emoji/">Noto Color Emoji</a>.
+            </li>
+            <li>
+              This site is using the <a href="http://ethanschoonover.com/solarized">Solarized</a>
+              color scheme by Ethan Schoonover.
+            </li>
+          </ul>
+        </p>
+      </article>
+    </main>
+  </body>
+</html>

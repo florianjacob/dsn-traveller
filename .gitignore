@@ -3,13 +3,7 @@
 **/*.rs.bk
 
 # graph output
-__pycache__
-graph
-*.dot
-*.gml
-*.graphml
-*.ps
-*.html
+/data
 
 # config files
 *.ron
