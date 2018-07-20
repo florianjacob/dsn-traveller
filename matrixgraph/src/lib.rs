@@ -30,7 +30,7 @@ pub enum NodeType {
     Server,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Node {
     pub kind: NodeType,
     pub id: u64,
@@ -80,11 +80,15 @@ fn graph_dir() -> PathBuf {
 
 pub fn write_graph(graph: &Graph) -> Result<(), serde_json::Error> {
     let dir = graph_dir();
+    write_graph_to(graph, dir.join("graph.json"))
+}
 
-    let file = fs::File::create(dir.join("graph.json")).expect("Could not create graph.json file");
+pub fn write_graph_to<P: AsRef<Path>>(graph: &Graph, path: P) -> Result<(), serde_json::Error> {
+    let file = fs::File::create(path).expect("Could not create graph file");
     let writer = io::BufWriter::new(file);
     serde_json::to_writer(writer, graph)
 }
+
 
 pub fn export_graph_to_graphml(graph: &Graph) -> io::Result<()> {
     let dir = graph_dir();
@@ -98,7 +102,7 @@ pub fn export_graph_to_graphml(graph: &Graph) -> io::Result<()> {
 pub fn export_graph_to_dot(graph: &Graph) -> io::Result<()> {
     let dir = graph_dir();
 
-    let no_edge_data = graph.map(|_, node| node.clone(), |_, _| NoEdgeData);
+    let no_edge_data = graph.map(|_, node| node, |_, _| NoEdgeData);
     let exported_graph = Dot::with_config(&no_edge_data, &[Config::EdgeNoLabel]);
     let file = fs::File::create(dir.join("graph.dot")).expect("Could not create graph/graph.dot file");
     let mut buffer = io::BufWriter::new(file);
