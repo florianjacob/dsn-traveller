@@ -30,7 +30,7 @@ pub enum NodeType {
     Server,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Node {
     pub kind: NodeType,
     pub id: u64,
