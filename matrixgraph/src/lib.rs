@@ -118,7 +118,7 @@ pub fn anonymize_graph(graph: Graph) -> Graph {
 }
 
 fn is_wellformed_node(graph: &Graph, idx: NodeIndex) -> bool {
-    match graph[idx].kind {
+    let is_wellformed = match graph[idx].kind {
         NodeType::User => {
             // a user needs exactly one HS and be a member of at least one room.
             // This should be impossible, as we get the HS from the user id and find users through a room.
@@ -137,7 +137,16 @@ fn is_wellformed_node(graph: &Graph, idx: NodeIndex) -> bool {
             graph.neighbors(idx).any(|neighbor_idx| graph[neighbor_idx].kind == NodeType::User)
             && graph.neighbors(idx).any(|neighbor_idx| graph[neighbor_idx].kind == NodeType::Room)
         },
+    };
+    if !is_wellformed {
+        eprintln!("malformed node: {}. neighbors: {} users, {} rooms, {} servers.",
+                  graph[idx],
+                  graph.neighbors(idx).filter(|&neighbor_idx| graph[neighbor_idx].kind == NodeType::User).count(),
+                  graph.neighbors(idx).filter(|&neighbor_idx| graph[neighbor_idx].kind == NodeType::Room).count(),
+                  graph.neighbors(idx).filter(|&neighbor_idx| graph[neighbor_idx].kind == NodeType::Server).count(),
+                 );
     }
+    is_wellformed
 }
 
 pub fn is_wellformed_graph(graph: &Graph) -> bool {
