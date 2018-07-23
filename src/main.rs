@@ -34,7 +34,7 @@ use clap::{Arg, App, SubCommand};
 use url::Url;
 use futures::prelude::*;
 use ruma_client::{Client, Session};
-use ruma_identifiers::{RoomAliasId, RoomIdOrAliasId, UserId};
+use ruma_identifiers::{RoomId, RoomAliasId, RoomIdOrAliasId, UserId};
 use tokio_core::reactor::{Core, Handle};
 
 
@@ -222,7 +222,7 @@ fn crawl(
     }
 }
 
-fn leave(
+fn leave_all(
     tokio_handle: Handle,
     ) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
 
@@ -233,7 +233,7 @@ fn leave(
 
         let control_room_id = await!(dsn_traveller::into_room_id(client.clone(), config.control_room.clone())).expect("Could not resolve control room alias");
 
-        let (left_count, joined_count) = await!(dsn_traveller::leave(client.clone(), control_room_id.clone()))?;
+        let (left_count, joined_count) = await!(dsn_traveller::leave_all(client.clone(), control_room_id.clone()))?;
 
         let message = format!("Good bye, Gentlemen! \
             Today, I departed from {} of the {} rooms I visited.",
@@ -245,6 +245,35 @@ fn leave(
         Ok(())
     }
 }
+
+fn leave(
+    tokio_handle: Handle,
+    room_id: RoomId,
+    ) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
+
+    let config = get_config();
+
+    async_block! {
+        let client = await!(get_client(&tokio_handle, &config))?;
+
+        let control_room_id = await!(dsn_traveller::into_room_id(client.clone(), config.control_room.clone())).expect("Could not resolve control room alias");
+
+        let message = match await!(dsn_traveller::leave(client.clone(), room_id.clone())) {
+            Ok(_) => {
+                format!("Good bye, Gentlemen! Today, I successfully departed from room {}.", room_id)
+            },
+            Err(e) => {
+                format!("Gentlemen, there was a hitch with leaving from room {}! {:?}", room_id, e)
+            },
+        };
+
+        await!(dsn_traveller::send_message(client.clone(), control_room_id, message.clone()))?;
+        eprintln!("{}", message);
+
+        Ok(())
+    }
+}
+
 
 
 fn main() {
@@ -270,7 +299,9 @@ fn main() {
                    )
         .subcommand(SubCommand::with_name("leave")
                     .display_order(3)
-                    .about("leave all previously-joined rooms")
+                    .about("leave given room id, or all previously-joined rooms if no id is given")
+                    .arg(Arg::with_name("room_id")
+                         .help("room id to leave"))
                    )
         .get_matches();
 
@@ -300,7 +331,24 @@ fn main() {
                 await!(join(handle, room_list))
             },
             ("crawl", Some(_)) => await!(crawl(handle)),
-            ("leave", Some(_)) => await!(leave(handle)),
+            ("leave", Some(_)) => {
+                let room_id = {
+                    let leave_matches = matches.subcommand_matches("leave").unwrap();
+                    if leave_matches.is_present("room_id") {
+                        let room_id = leave_matches.value_of("room_id").unwrap();
+                        let room_id = RoomId::try_from(room_id).expect("Unable to parse given RoomId");
+                        Some(room_id)
+                    } else {
+                        None
+                    }
+                };
+                if let Some(room_id) = room_id {
+                    await!(leave(handle, room_id))
+                }
+                else {
+                    await!(leave_all(handle))
+                }
+            },
             ("", None) => {
                 eprintln!("No subcommand given.");
                 Ok(())

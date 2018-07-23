@@ -456,7 +456,7 @@ pub fn crawl<C: Connect>(client: Client<C>) -> Result<(usize, usize, usize), rum
 }
 
 #[async]
-pub fn leave<C: Connect>(client: Client<C>, control_room: RoomId) -> Result<(usize, usize), ruma_client::Error> {
+pub fn leave_all<C: Connect>(client: Client<C>, control_room: RoomId) -> Result<(usize, usize), ruma_client::Error> {
     let joined_rooms = await!(joined_rooms(client.clone()))?;
 
     // ignore control room
@@ -474,7 +474,7 @@ pub fn leave<C: Connect>(client: Client<C>, control_room: RoomId) -> Result<(usi
             match await!(leave_and_forget_room(client.clone(), room_id.clone())) {
                 Ok(_) => {
                     left_count += 1;
-                    eprintln!("Left room: {:?} ({}/{})", room_id, left_count, joined_count);
+                    eprintln!("Left room: {} ({}/{})", room_id, left_count, joined_count);
                 },
                 Err(e) => eprintln!("Error leaving / forgetting room {}: {:?}", room_id, e),
             }
@@ -482,4 +482,23 @@ pub fn leave<C: Connect>(client: Client<C>, control_room: RoomId) -> Result<(usi
     }
 
     Ok((left_count, joined_count))
+}
+
+#[async]
+pub fn leave<C: Connect>(client: Client<C>, room_id: RoomId) -> Result<(), ruma_client::Error> {
+    // leaving as well as forgetting so that the server could part the federation for that rooms.
+    // Also, if we would not forget leaved rooms, they would appear as rooms where the bot has been
+    // kicked from on a later join run.
+    // TODO: is leave_and_forget_room enough so that the server can be shut down
+    // without being a dead member of the federation?
+    match await!(leave_and_forget_room(client.clone(), room_id.clone())) {
+        Ok(_) => {
+            eprintln!("Left room: {}", room_id);
+            Ok(())
+        },
+        Err(e) => {
+            eprintln!("Error leaving / forgetting room {}: {:?}", room_id, e);
+            Err(e)
+        }
+    }
 }
