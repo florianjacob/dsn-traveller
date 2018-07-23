@@ -426,13 +426,6 @@ pub fn crawl<C: Connect>(client: Client<C>) -> Result<(usize, usize, usize), rum
     for room in joined_rooms {
         await!(Delay::new(ROOM_CRAWL_DELAY)).expect("wait failed");
 
-        let room_node = graph.add_node(Node {
-            kind: NodeType::Room,
-            id: hash(&hash_key, &room),
-        });
-        assert!(!room_indexes.contains_key(&room));
-        room_indexes.insert(room.clone(), room_node);
-
         // occasionally this resulted in a bad gateway error
         // could not find the synapse log lines for that, but it's probably due to server overload.
         // redoing it once worked fine.
@@ -444,41 +437,41 @@ pub fn crawl<C: Connect>(client: Client<C>) -> Result<(usize, usize, usize), rum
             },
         };
 
-        // TODO: should I try to completely ignore rooms with 2 members of which one is myself?
-        // -> mainly IRC Bridge ChanServ/NickServ/… rooms
-        // what about empty rooms, where only traveller (and possibly voyager, or users of
-        // opted-out servers) are in?
         for member in members {
             if member_ignore_pattern.is_match(member.as_str()) {
                 continue;
             }
+            // if we came as far as here, there's at least one non-ignored user in that room, and
+            // we can add it to the graph.
+            let room_idx = room_indexes.entry(room.clone()).or_insert_with(|| {
+                graph.add_node(Node {
+                    kind: NodeType::Room,
+                    id: hash(&hash_key, &room),
+                })
+            });
+
             let (_, server) = member.split_at(member.find(':').unwrap() + 1);
             let server = server.to_string();
-            if !server_indexes.contains_key(&server) {
-                let server_node = graph.add_node(Node {
+            let server_idx = server_indexes.entry(server.clone()).or_insert_with(|| {
+                graph.add_node(Node {
                     kind: NodeType::Server,
                     id: hash(&hash_key, &server),
-                });
-                server_indexes.insert(server.clone(), server_node);
-            }
+                })
+            });
 
             let user_id = UserId::try_from(member.as_str()).unwrap();
-            if !user_indexes.contains_key(&user_id) {
-                let user_node = graph.add_node(Node {
+            let user_idx = user_indexes.entry(user_id.clone()).or_insert_with(|| {
+                let user_idx = graph.add_node(Node {
                     kind: NodeType::User,
                     id: hash(&hash_key, &user_id),
                 });
-                user_indexes.insert(user_id.clone(), user_node);
+                graph.add_edge(user_idx, *server_idx, ());
+                user_idx
+            });
 
-                let server_node = server_indexes.get(&server).unwrap();
-                graph.add_edge(user_node, *server_node, ());
-            }
-
-            let user_node = user_indexes.get(&user_id).unwrap();
-            graph.add_edge(*user_node, room_node, ());
+            graph.add_edge(*user_idx, *room_idx, ());
             // connect room and the user's server in case that edge was not yet there
-            let server_node = server_indexes.get(&server).unwrap();
-            graph.update_edge(*server_node, room_node, ());
+            graph.update_edge(*server_idx, *room_idx, ());
         }
         crawled_rooms += 1;
         eprintln!("Crawled {}/{} rooms", crawled_rooms, rooms_to_crawl);
