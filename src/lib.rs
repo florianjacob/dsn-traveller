@@ -40,7 +40,7 @@ use ruma_events::room::member::MembershipState;
 use ruma_identifiers::{RoomId, RoomAliasId, RoomIdOrAliasId, EventId, UserId};
 use futures_timer::Delay;
 
-use petgraph::Graph;
+use petgraph::prelude::*;
 
 use hyper::client::Connect;
 
@@ -380,9 +380,9 @@ pub fn crawl<C: Connect>(client: Client<C>) -> Result<(usize, usize, usize), rum
     let joined_rooms = await!(joined_rooms(client.clone()))?;
     let mut graph: Graph<Node, (), petgraph::Undirected> = Graph::new_undirected();
 
-    let mut room_indexes = HashMap::<RoomId, petgraph::graph::NodeIndex<petgraph::graph::DefaultIx>>::new();
-    let mut user_indexes = HashMap::<UserId, petgraph::graph::NodeIndex<petgraph::graph::DefaultIx>>::new();
-    let mut server_indexes = HashMap::<String, petgraph::graph::NodeIndex<petgraph::graph::DefaultIx>>::new();
+    let mut room_indexes = HashMap::<RoomId, NodeIndex>::new();
+    let mut user_indexes = HashMap::<UserId, NodeIndex>::new();
+    let mut server_indexes = HashMap::<String, NodeIndex>::new();
 
     // pseudonymization:
     // on each crawl, choose a different random has function
@@ -441,6 +441,8 @@ pub fn crawl<C: Connect>(client: Client<C>) -> Result<(usize, usize, usize), rum
         crawled_rooms += 1;
         eprintln!("Crawled {}/{} rooms", crawled_rooms, rooms_to_crawl);
     }
+
+    assert!(matrixgraph::is_wellformed_graph(&graph));
 
     let graph = matrixgraph::anonymize_graph(graph);
 
