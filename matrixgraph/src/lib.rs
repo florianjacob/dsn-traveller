@@ -122,20 +122,20 @@ fn is_wellformed_node(graph: &Graph, idx: NodeIndex) -> bool {
         NodeType::User => {
             // a user needs exactly one HS and be a member of at least one room.
             // This should be impossible, as we get the HS from the user id and find users through a room.
-            graph.neighbors(idx).filter(|neighbor_idx| graph[*neighbor_idx].kind == NodeType::Server).count() == 1
-            && graph.neighbors(idx).find(|neighbor_idx| graph[*neighbor_idx].kind == NodeType::Room).is_some()
+            graph.neighbors(idx).filter(|&neighbor_idx| graph[neighbor_idx].kind == NodeType::Server).count() == 1
+            && graph.neighbors(idx).any(|neighbor_idx| graph[neighbor_idx].kind == NodeType::Room)
         },
         NodeType::Room => {
             // A room needs at least one user and at least one server. Could be caused by ignore patterns.
             // As those disconnected rooms do nothing for the simulation an only dillute the results, I should remove them.
-            graph.neighbors(idx).find(|neighbor_idx| graph[*neighbor_idx].kind == NodeType::User).is_some()
-            && graph.neighbors(idx).find(|neighbor_idx| graph[*neighbor_idx].kind == NodeType::Server).is_some()
+            graph.neighbors(idx).any(|neighbor_idx| graph[neighbor_idx].kind == NodeType::User)
+            && graph.neighbors(idx).any(|neighbor_idx| graph[neighbor_idx].kind == NodeType::Server)
         },
         NodeType::Server => {
             // A server needs at least one user and at least one room.
             // This should be impossible, as we only can see servers through a user in a room.
-            graph.neighbors(idx).find(|neighbor_idx| graph[*neighbor_idx].kind == NodeType::User).is_some()
-            && graph.neighbors(idx).find(|neighbor_idx| graph[*neighbor_idx].kind == NodeType::Room).is_some()
+            graph.neighbors(idx).any(|neighbor_idx| graph[neighbor_idx].kind == NodeType::User)
+            && graph.neighbors(idx).any(|neighbor_idx| graph[neighbor_idx].kind == NodeType::Room)
         },
     }
 }
