@@ -13,6 +13,7 @@ use std::io;
 use std::fs;
 use std::fmt;
 use std::path::{Path, PathBuf};
+use petgraph::prelude::*;
 use petgraph::dot::{Dot, Config};
 use petgraph_graphml::GraphMl;
 
@@ -114,4 +115,31 @@ pub fn anonymize_graph(graph: Graph) -> Graph {
     let mut rng = rand::thread_rng();
     let salt = rng.gen::<u64>();
     graph.map(|_, node| Node { kind: node.kind, id: hash_with_salt(&hash_key, &node.id, salt)}, |_, _| ())
+}
+
+fn is_wellformed_node(graph: &Graph, idx: NodeIndex) -> bool {
+    match graph[idx].kind {
+        NodeType::User => {
+            // a user needs exactly one HS and be a member of at least one room.
+            // This should be impossible, as we get the HS from the user id and find users through a room.
+            graph.neighbors(idx).filter(|neighbor_idx| graph[*neighbor_idx].kind == NodeType::Server).count() == 1
+            && graph.neighbors(idx).find(|neighbor_idx| graph[*neighbor_idx].kind == NodeType::Room).is_some()
+        },
+        NodeType::Room => {
+            // A room needs at least one user and at least one server. Could be caused by ignore patterns.
+            // As those disconnected rooms do nothing for the simulation an only dillute the results, I should remove them.
+            graph.neighbors(idx).find(|neighbor_idx| graph[*neighbor_idx].kind == NodeType::User).is_some()
+            && graph.neighbors(idx).find(|neighbor_idx| graph[*neighbor_idx].kind == NodeType::Server).is_some()
+        },
+        NodeType::Server => {
+            // A server needs at least one user and at least one room.
+            // This should be impossible, as we only can see servers through a user in a room.
+            graph.neighbors(idx).find(|neighbor_idx| graph[*neighbor_idx].kind == NodeType::User).is_some()
+            && graph.neighbors(idx).find(|neighbor_idx| graph[*neighbor_idx].kind == NodeType::Room).is_some()
+        },
+    }
+}
+
+pub fn is_wellformed_graph(graph: &Graph) -> bool {
+    graph.node_indices().all(|idx| is_wellformed_node(graph, idx))
 }
