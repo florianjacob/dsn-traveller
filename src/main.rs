@@ -3,13 +3,13 @@
 #![feature(try_from)]
 
 extern crate futures_await as futures;
-extern crate tokio_core;
-extern crate ruma_client;
-extern crate ruma_identifiers;
-extern crate url;
 extern crate hostname;
 extern crate hyper;
 extern crate hyper_tls;
+extern crate ruma_client;
+extern crate ruma_identifiers;
+extern crate tokio_core;
+extern crate url;
 
 #[macro_use]
 extern crate clap;
@@ -18,30 +18,26 @@ extern crate dsn_traveller;
 
 #[macro_use]
 extern crate serde_derive;
+extern crate ron;
 extern crate serde;
 extern crate url_serde;
-extern crate ron;
 
-
+use std::convert::TryFrom;
 use std::fs;
 use std::io;
 use std::io::prelude::*;
-use std::convert::TryFrom;
 use std::iter::FromIterator;
 
-use clap::{Arg, App, SubCommand};
+use clap::{App, Arg, SubCommand};
 
-use url::Url;
 use futures::prelude::*;
 use ruma_client::{Client, Session};
-use ruma_identifiers::{RoomId, RoomAliasId, RoomIdOrAliasId, UserId};
+use ruma_identifiers::{RoomAliasId, RoomId, RoomIdOrAliasId, UserId};
 use tokio_core::reactor::{Core, Handle};
+use url::Url;
 
-
-use hyper_tls::HttpsConnector;
 use hyper::client::HttpConnector;
-
-
+use hyper_tls::HttpsConnector;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct TravellerConfig {
@@ -76,24 +72,29 @@ impl Into<Session> for StoredSession {
     }
 }
 
-
 fn load_config() -> Result<TravellerConfig, io::Error> {
     let file = fs::File::open("config.ron")?;
     let reader = io::BufReader::new(file);
-    let config: TravellerConfig = ron::de::from_reader(reader).expect("Could not deserialize config.ron");
+    let config: TravellerConfig =
+        ron::de::from_reader(reader).expect("Could not deserialize config.ron");
     Ok(config)
 }
 
 fn store_config(config: &TravellerConfig) -> Result<(), io::Error> {
     let file = fs::File::create("config.ron")?;
     let mut buffer = io::BufWriter::new(file);
-    write!(&mut buffer, "{}", ron::ser::to_string_pretty(&config, ron::ser::PrettyConfig::default()).unwrap())
+    write!(
+        &mut buffer,
+        "{}",
+        ron::ser::to_string_pretty(&config, ron::ser::PrettyConfig::default()).unwrap()
+    )
 }
 
 fn load_session() -> Result<Session, io::Error> {
     let file = fs::File::open("session.ron")?;
     let reader = io::BufReader::new(file);
-    let session: StoredSession = ron::de::from_reader(reader).expect("could not deserialize session.ron");
+    let session: StoredSession =
+        ron::de::from_reader(reader).expect("could not deserialize session.ron");
     Ok(session.into())
 }
 
@@ -101,7 +102,11 @@ fn store_session(session: Session) -> Result<(), io::Error> {
     let file = fs::File::create("session.ron")?;
     let mut buffer = io::BufWriter::new(file);
     let session: StoredSession = session.into();
-    write!(&mut buffer, "{}", ron::ser::to_string_pretty(&session, ron::ser::PrettyConfig::default()).unwrap())
+    write!(
+        &mut buffer,
+        "{}",
+        ron::ser::to_string_pretty(&session, ron::ser::PrettyConfig::default()).unwrap()
+    )
 }
 
 fn get_config() -> TravellerConfig {
@@ -130,7 +135,10 @@ fn get_config() -> TravellerConfig {
     }
 }
 
-fn get_client(tokio_handle: &Handle, config: &TravellerConfig) -> impl Future<Item = Client<HttpsConnector<HttpConnector>>, Error = ruma_client::Error> {
+fn get_client(
+    tokio_handle: &Handle,
+    config: &TravellerConfig,
+) -> impl Future<Item = Client<HttpsConnector<HttpConnector>>, Error = ruma_client::Error> {
     let mut needs_login = false;
 
     let client = match load_session() {
@@ -170,8 +178,7 @@ fn get_client(tokio_handle: &Handle, config: &TravellerConfig) -> impl Future<It
 fn join(
     tokio_handle: Handle,
     room_list: Vec<String>,
-    ) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
-
+) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
     let config = get_config();
 
     async_block! {
@@ -197,10 +204,7 @@ fn join(
     }
 }
 
-fn crawl(
-    tokio_handle: Handle,
-    ) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
-
+fn crawl(tokio_handle: Handle) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
     let config = get_config();
 
     async_block! {
@@ -222,10 +226,7 @@ fn crawl(
     }
 }
 
-fn leave_all(
-    tokio_handle: Handle,
-    ) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
-
+fn leave_all(tokio_handle: Handle) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
     let config = get_config();
 
     async_block! {
@@ -249,8 +250,7 @@ fn leave_all(
 fn leave(
     tokio_handle: Handle,
     room_id: RoomId,
-    ) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
-
+) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
     let config = get_config();
 
     async_block! {
@@ -273,8 +273,6 @@ fn leave(
         Ok(())
     }
 }
-
-
 
 fn main() {
     let matches = App::new("DSN Traveller")
