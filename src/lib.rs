@@ -28,6 +28,7 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::iter::FromIterator;
 use std::time;
+use std::fmt;
 
 use futures::prelude::*;
 use futures_timer::Delay;
@@ -78,6 +79,29 @@ fn randomize_txnid(txn_id: &mut AtomicUsize) {
     let mut rng = rand::thread_rng();
     let id = rng.gen::<usize>();
     txn_id.store(id, Ordering::Relaxed);
+}
+
+// this is essentially a ruma_identifiers::UserId without localpart,
+// to profit from the UserId parsing rules and being easily able to differentiate servers if they
+// have  non-standard port numbers
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct ServerId {
+    hostname: url::Host,
+    port: u16,
+}
+
+impl ServerId {
+    fn new(user_id: &UserId) -> Self {
+        ServerId {
+            hostname: user_id.hostname().clone(),
+            port: user_id.port(),
+        }
+    }
+}
+impl fmt::Display for ServerId {
+    fn fmt(&self,  f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}:{}", self.hostname, self.port)
+    }
 }
 
 #[async]
@@ -415,7 +439,7 @@ pub fn crawl<C: Connect>(client: Client<C>) -> Result<(usize, usize, usize), rum
 
     let mut room_indexes = HashMap::<RoomId, NodeIndex>::new();
     let mut user_indexes = HashMap::<UserId, NodeIndex>::new();
-    let mut server_indexes = HashMap::<String, NodeIndex>::new();
+    let mut server_indexes = HashMap::<ServerId, NodeIndex>::new();
 
     // pseudonymization:
     // on each crawl, choose a different random has function
@@ -450,16 +474,19 @@ pub fn crawl<C: Connect>(client: Client<C>) -> Result<(usize, usize, usize), rum
                 })
             });
 
-            let (_, server) = member.split_at(member.find(':').unwrap() + 1);
-            let server = server.to_string();
-            let server_idx = server_indexes.entry(server.clone()).or_insert_with(|| {
+            let user_id = UserId::try_from(member.as_str()).unwrap();
+            let server_id = ServerId::new(&user_id);
+            let is_new_server = !server_indexes.contains_key(&server_id);
+            let server_idx = server_indexes.entry(server_id.clone()).or_insert_with(|| {
                 graph.add_node(Node {
                     kind: NodeType::Server,
-                    id: hash(&hash_key, &server),
+                    id: hash(&hash_key, &server_id),
                 })
             });
 
-            let user_id = UserId::try_from(member.as_str()).unwrap();
+            // is_new_server -> !user_indexes.contains_key,
+            // if this is a new server, it can't have users yet
+            debug_assert!(!is_new_server || !user_indexes.contains_key(&user_id), "Server {} is new, but we already found User {}!", server_id, user_id);
             let user_idx = user_indexes.entry(user_id.clone()).or_insert_with(|| {
                 let user_idx = graph.add_node(Node {
                     kind: NodeType::User,
