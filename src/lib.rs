@@ -26,9 +26,9 @@ extern crate matrixgraph;
 
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
+use std::fmt;
 use std::iter::FromIterator;
 use std::time;
-use std::fmt;
 
 use futures::prelude::*;
 use futures_timer::Delay;
@@ -99,7 +99,7 @@ impl ServerId {
     }
 }
 impl fmt::Display for ServerId {
-    fn fmt(&self,  f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}:{}", self.hostname, self.port)
     }
 }
@@ -486,7 +486,12 @@ pub fn crawl<C: Connect>(client: Client<C>) -> Result<(usize, usize, usize), rum
 
             // is_new_server -> !user_indexes.contains_key,
             // if this is a new server, it can't have users yet
-            debug_assert!(!is_new_server || !user_indexes.contains_key(&user_id), "Server {} is new, but we already found User {}!", server_id, user_id);
+            debug_assert!(
+                !is_new_server || !user_indexes.contains_key(&user_id),
+                "Server {} is new, but we already found User {}!",
+                server_id,
+                user_id
+            );
             let user_idx = user_indexes.entry(user_id.clone()).or_insert_with(|| {
                 let user_idx = graph.add_node(Node {
                     kind: NodeType::User,
@@ -508,11 +513,10 @@ pub fn crawl<C: Connect>(client: Client<C>) -> Result<(usize, usize, usize), rum
 
     let graph = matrixgraph::anonymize_graph(graph);
 
-    matrixgraph::write_graph(&graph).unwrap();
-
-    matrixgraph::export_graph_to_dot(&graph).unwrap();
-
-    matrixgraph::export_graph_to_graphml(&graph).unwrap();
+    let dir = matrixgraph::graph_dir();
+    matrixgraph::write_graph(&graph, &dir).unwrap();
+    matrixgraph::export_graph_to_dot(&graph, &dir).unwrap();
+    matrixgraph::export_graph_to_graphml(&graph, &dir).unwrap();
 
     Ok((room_indexes.len(), user_indexes.len(), server_indexes.len()))
 }
