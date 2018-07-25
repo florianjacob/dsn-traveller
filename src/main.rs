@@ -226,7 +226,7 @@ fn crawl(tokio_handle: Handle) -> impl Future<Item = (), Error = ruma_client::Er
     }
 }
 
-fn leave_all(tokio_handle: Handle) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
+fn exit_all(tokio_handle: Handle) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
     let config = get_config();
 
     async_block! {
@@ -234,7 +234,7 @@ fn leave_all(tokio_handle: Handle) -> impl Future<Item = (), Error = ruma_client
 
         let control_room_id = await!(dsn_traveller::into_room_id(client.clone(), config.control_room.clone())).expect("Could not resolve control room alias");
 
-        let (left_count, joined_count) = await!(dsn_traveller::leave_all(client.clone(), control_room_id.clone()))?;
+        let (left_count, joined_count) = await!(dsn_traveller::exit_all(client.clone(), control_room_id.clone()))?;
 
         let message = format!("Good bye, Gentlemen! \
             Today, I departed from {} of the {} rooms I visited.",
@@ -247,7 +247,7 @@ fn leave_all(tokio_handle: Handle) -> impl Future<Item = (), Error = ruma_client
     }
 }
 
-fn leave(
+fn exit(
     tokio_handle: Handle,
     room_id: RoomId,
 ) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
@@ -258,7 +258,7 @@ fn leave(
 
         let control_room_id = await!(dsn_traveller::into_room_id(client.clone(), config.control_room.clone())).expect("Could not resolve control room alias");
 
-        let message = match await!(dsn_traveller::leave(client.clone(), room_id.clone())) {
+        let message = match await!(dsn_traveller::exit(client.clone(), room_id.clone())) {
             Ok(_) => {
                 format!("Good bye, Gentlemen! Today, I successfully departed from room {}.", room_id)
             },
@@ -295,11 +295,11 @@ fn main() {
                     .display_order(2)
                     .about("visit all joined rooms and store the network graph")
                    )
-        .subcommand(SubCommand::with_name("leave")
+        .subcommand(SubCommand::with_name("exit")
                     .display_order(3)
-                    .about("leave given room id, or all previously-joined rooms if no id is given")
+                    .about("leave and forget given room id, or all previously-joined rooms if no id is given")
                     .arg(Arg::with_name("room_id")
-                         .help("room id to leave"))
+                         .help("room id to leave & forget"))
                    )
         .get_matches();
 
@@ -329,11 +329,11 @@ fn main() {
                 await!(join(handle, room_list))
             },
             ("crawl", Some(_)) => await!(crawl(handle)),
-            ("leave", Some(_)) => {
+            ("exit", Some(_)) => {
                 let room_id = {
-                    let leave_matches = matches.subcommand_matches("leave").unwrap();
-                    if leave_matches.is_present("room_id") {
-                        let room_id = leave_matches.value_of("room_id").unwrap();
+                    let exit_matches = matches.subcommand_matches("exit").unwrap();
+                    if exit_matches.is_present("room_id") {
+                        let room_id = exit_matches.value_of("room_id").unwrap();
                         let room_id = RoomId::try_from(room_id).expect("Unable to parse given RoomId");
                         Some(room_id)
                     } else {
@@ -341,10 +341,10 @@ fn main() {
                     }
                 };
                 if let Some(room_id) = room_id {
-                    await!(leave(handle, room_id))
+                    await!(exit(handle, room_id))
                 }
                 else {
-                    await!(leave_all(handle))
+                    await!(exit_all(handle))
                 }
             },
             ("", None) => {

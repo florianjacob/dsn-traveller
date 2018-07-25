@@ -518,7 +518,7 @@ pub fn crawl<C: Connect>(client: Client<C>) -> Result<(usize, usize, usize), rum
 }
 
 #[async]
-pub fn leave_all<C: Connect>(
+pub fn exit_all<C: Connect>(
     client: Client<C>,
     control_room: RoomId,
 ) -> Result<(usize, usize), ruma_client::Error> {
@@ -550,7 +550,7 @@ pub fn leave_all<C: Connect>(
 }
 
 #[async]
-pub fn leave<C: Connect>(client: Client<C>, room_id: RoomId) -> Result<(), ruma_client::Error> {
+pub fn exit<C: Connect>(client: Client<C>, room_id: RoomId) -> Result<(), ruma_client::Error> {
     // leaving as well as forgetting so that the server could part the federation for that rooms.
     // Also, if we would not forget leaved rooms, they would appear as rooms where the bot has been
     // kicked from on a later join run.
