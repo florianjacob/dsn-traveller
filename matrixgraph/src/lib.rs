@@ -184,23 +184,63 @@ pub fn is_wellformed_graph(graph: &Graph) -> bool {
 }
 
 // returns map from server id to number of users and rooms
-pub fn user_room_distribution(graph: &Graph) -> HashMap<u64, (usize, usize)> {
+pub fn users_rooms_per_server_distribution(graph: &Graph) -> HashMap<u64, (usize, usize)> {
     graph
         .node_indices()
         .filter(|idx| graph[*idx].kind == NodeType::Server)
-        .map(|server_idx| {
+        .map(|idx| {
             (
-                graph[server_idx].id,
+                graph[idx].id,
                 (
                     graph
-                        .neighbors(server_idx)
+                        .neighbors(idx)
                         .filter(|&neighbor_idx| graph[neighbor_idx].kind == NodeType::User)
                         .count(),
                     graph
-                        .neighbors(server_idx)
+                        .neighbors(idx)
                         .filter(|&neighbor_idx| graph[neighbor_idx].kind == NodeType::Room)
                         .count(),
                 ),
+            )
+        })
+        .collect()
+}
+
+// returns map from room id to number of users and servers
+pub fn users_servers_per_room_distribution(graph: &Graph) -> HashMap<u64, (usize, usize)> {
+    graph
+        .node_indices()
+        .filter(|idx| graph[*idx].kind == NodeType::Room)
+        .map(|idx| {
+            (
+                graph[idx].id,
+                (
+                    graph
+                        .neighbors(idx)
+                        .filter(|&neighbor_idx| graph[neighbor_idx].kind == NodeType::User)
+                        .count(),
+                    graph
+                        .neighbors(idx)
+                        .filter(|&neighbor_idx| graph[neighbor_idx].kind == NodeType::Server)
+                        .count(),
+                ),
+            )
+        })
+        .collect()
+}
+
+// returns map from user id to number of rooms (servers per user makes no sense as that's 1:n)
+pub fn rooms_per_user_distribution(graph: &Graph) -> HashMap<u64, usize> {
+    graph
+        .node_indices()
+        .filter(|idx| graph[*idx].kind == NodeType::User)
+        .map(|idx| {
+            (
+                graph[idx].id,
+                graph
+                    .neighbors(idx)
+                    .filter(|&neighbor_idx| graph[neighbor_idx].kind == NodeType::Room)
+                    .count(),
             )
         })
         .collect()
