@@ -3,49 +3,47 @@ name = "dsn-traveller"
 version = "0.1.0"
 license = "AGPL-3.0-or-later"
 authors = ["Florian Jacob <projects+git@florianjacob.de>"]
+edition = "2018"
 
 [dependencies]
-futures-await = { git = "https://github.com/alexcrichton/futures-await" }
-tokio-core = "0.1"
+futures = "0.1"
+tokio = { version = "0.1", features = ["async-await-preview"] }
+tokio-async-await = "0.1"
 futures-timer = "0.1"
 url = "1"
-hyper = "0.11"
-hyper-tls = "0.1"
+hyper = "0.12"
+hyper-tls = "0.3"
+http = "0.1"
 clap = "2"
 petgraph = { version = "0.4", features = ["graphmap", "serde-1"] }
 petgraph-graphml = "1"
 hostname = "0.1"
-rand = "0.5"
+rand = "0.6"
 matrixgraph = { path = "matrixgraph" }
 
-serde = "1"
-serde_derive = "1"
+serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 url_serde = "0.2"
-ron = "0.2"
-regex = "0.2"
+ron = "0.4"
+regex = "1"
 lazy_static = "1"
 
 [dependencies.ruma-client]
 git = "https://github.com/florianjacob/ruma-client"
-branch = "supercombiner"
+branch = "joined_rooms"
 
 [dependencies.ruma-events]
 git = "https://github.com/florianjacob/ruma-events"
-branch = "supercombiner"
+branch = "hypercombiner"
 
 [dependencies.ruma-identifiers]
-git = "https://github.com/fest-im/ruma-identifiers"
+git = "https://github.com/ruma/ruma-identifiers"
 branch = "synapse-workarounds"
 
-# [patch.'https://github.com/musoke/ruma-client-api']
-# ruma-client-api = { git = "https://github.com/florianjacob/ruma-client-api", branch = 'supercombiner' }
-# ruma-client-api = { path = "../ruma-client-api" }
-
 [patch.crates-io]
-# ruma-events = { git = 'https://github.com/fest-im/ruma-events', branch = 'synapse-workarounds' }
-# ruma-events = { path = "../ruma-events" }
-ruma-events = { git = 'https://github.com/florianjacob/ruma-events', branch = 'supercombiner' }
-ruma-identifiers = { git = 'https://github.com/fest-im/ruma-identifiers', branch = 'synapse-workarounds' }
-# ruma-api-macros = { path = "../ruma-api-macros" }
-ruma-api-macros = { git = 'https://github.com/florianjacob/ruma-api-macros', branch = 'backport-fix-statuscode' }
+ruma-events = { git = 'https://github.com/florianjacob/ruma-events', branch = 'hypercombiner' }
+ruma-identifiers = { git = 'https://github.com/ruma/ruma-identifiers', branch = 'synapse-workarounds' }
+# need to patch ruma-client until next release (after 0.2.0) of ruma-client-api
+ruma-client-api = { git = 'https://github.com/ruma/ruma-client-api', branch = 'master' }
+# need to patch ruma-api-macros for ron compatibility until next release (after 0.3.0)
+ruma-api-macros = { git = 'https://github.com/ruma/ruma-api-macros', branch = 'import-fix' }

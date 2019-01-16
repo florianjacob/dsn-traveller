@@ -1,28 +1,6 @@
-#![feature(generators)]
-#![feature(proc_macro, proc_macro_non_items)]
 #![feature(try_from)]
-
-extern crate futures_await as futures;
-extern crate futures_timer;
-extern crate hyper;
-extern crate petgraph;
-extern crate petgraph_graphml;
-extern crate rand;
-extern crate ruma_client;
-extern crate ruma_events;
-extern crate ruma_identifiers;
-extern crate tokio_core;
-extern crate url;
-
-extern crate regex;
-extern crate ron;
-extern crate serde;
-extern crate serde_json;
-
-#[macro_use]
-extern crate lazy_static;
-
-extern crate matrixgraph;
+// enable the await! macro, async support, and the new std::Futures api.
+#![feature(await_macro, async_await, futures_api)]
 
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
@@ -30,7 +8,8 @@ use std::fmt;
 use std::iter::FromIterator;
 use std::time;
 
-use futures::prelude::*;
+use tokio::await;
+
 use futures_timer::Delay;
 use ruma_client::api::r0;
 use ruma_client::Client;
@@ -42,21 +21,26 @@ use ruma_identifiers::{EventId, RoomAliasId, RoomId, RoomIdOrAliasId, UserId};
 
 use petgraph::prelude::*;
 
-use hyper::client::Connect;
+use hyper::client::connect::Connect;
+
+use lazy_static::lazy_static;
 
 use rand::Rng;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hash, Hasher};
-use std::sync::atomic::{AtomicUsize, Ordering, ATOMIC_USIZE_INIT};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use matrixgraph::{Node, NodeType};
 
+// if we continue to use the same access token,
+// we need to try to have unique txnids.
+// alternatively, we could store the last txnid on shutdown
 lazy_static! {
     static ref TXN_ID: AtomicUsize = {
-        let mut txn_id = ATOMIC_USIZE_INIT;
-        randomize_txnid(&mut txn_id);
-        txn_id
+        let mut rng = rand::thread_rng();
+        let id = rng.gen();
+        AtomicUsize::new(id)
     };
 }
 
@@ -71,15 +55,6 @@ lazy_static! {
 // 5 seconds resulted in load factor of 4, spacing out to have more time for the computation
 static ROOM_JOIN_DELAY: time::Duration = time::Duration::from_millis(64000);
 static ROOM_CRAWL_DELAY: time::Duration = time::Duration::from_millis(500);
-
-// if we continue to use the same access token,
-// we need to try to have unique txnids.
-// alternatively, we could store the last txnid on shutdown
-fn randomize_txnid(txn_id: &mut AtomicUsize) {
-    let mut rng = rand::thread_rng();
-    let id = rng.gen::<usize>();
-    txn_id.store(id, Ordering::Relaxed);
-}
 
 // this is essentially a ruma_identifiers::UserId without localpart,
 // to profit from the UserId parsing rules and being easily able to differentiate servers if they
@@ -104,8 +79,7 @@ impl fmt::Display for ServerId {
     }
 }
 
-#[async]
-pub fn send_message<C: Connect>(
+pub async fn send_message<C: Connect + 'static>(
     client: Client<C>,
     room_id: RoomId,
     message: String,
@@ -126,15 +100,15 @@ pub fn send_message<C: Connect>(
     Ok(response.event_id)
 }
 
-#[async]
-fn joined_rooms<C: Connect>(client: Client<C>) -> Result<Vec<RoomId>, ruma_client::Error> {
+async fn joined_rooms<C: Connect + 'static>(
+    client: Client<C>,
+) -> Result<Vec<RoomId>, ruma_client::Error> {
     use r0::membership::joined_rooms;
     let response = await!(joined_rooms::call(client.clone(), joined_rooms::Request {}))?;
     Ok(response.joined_rooms)
 }
 
-#[async]
-fn sync_rooms<C: Connect>(
+async fn sync_rooms<C: Connect + 'static>(
     client: Client<C>,
 ) -> Result<r0::sync::sync_events::Rooms, ruma_client::Error> {
     use r0::filter;
@@ -198,13 +172,13 @@ fn sync_rooms<C: Connect>(
             set_presence: None,
             timeout: None,
         }
-    )).expect("Could not get sync response");
+    ))
+    .expect("Could not get sync response");
     eprintln!("next batch: {}", response.next_batch);
     Ok(response.rooms)
 }
 
-#[async]
-pub fn join_rooms<C: Connect>(
+pub async fn join_rooms<C: Connect + 'static>(
     client: Client<C>,
     room_aliases: Vec<RoomAliasId>,
 ) -> Result<(usize, usize, usize), ruma_client::Error> {
@@ -292,7 +266,7 @@ pub fn join_rooms<C: Connect>(
         }
     }
 
-    if room_aliases.len() == 0 {
+    if room_aliases.is_empty() {
         eprintln!("no new rooms given to join.");
         return Ok((join_count, invite_count, rooms.leave.len()));
     }
@@ -349,8 +323,7 @@ pub fn join_rooms<C: Connect>(
     Ok((join_count, invite_count, rooms.leave.len()))
 }
 
-#[async]
-fn leave_and_forget_room<C: Connect>(
+async fn leave_and_forget_room<C: Connect + 'static>(
     client: Client<C>,
     room_id: RoomId,
 ) -> Result<(), ruma_client::Error> {
@@ -370,8 +343,7 @@ fn leave_and_forget_room<C: Connect>(
     Ok(())
 }
 
-#[async]
-pub fn resolve_alias<C: Connect>(
+pub async fn resolve_alias<C: Connect + 'static>(
     client: Client<C>,
     room_alias: RoomAliasId,
 ) -> Result<RoomId, ruma_client::Error> {
@@ -383,8 +355,7 @@ pub fn resolve_alias<C: Connect>(
     Ok(response.room_id)
 }
 
-#[async]
-pub fn into_room_id<C: Connect>(
+pub async fn into_room_id<C: Connect + 'static>(
     client: Client<C>,
     room_id_or_alias_id: RoomIdOrAliasId,
 ) -> Result<RoomId, ruma_client::Error> {
@@ -395,8 +366,7 @@ pub fn into_room_id<C: Connect>(
 }
 
 /// delivers the user ids of all users currently joined in the given room
-#[async]
-fn room_members<C: Connect>(
+async fn room_members<C: Connect + 'static>(
     client: Client<C>,
     room_id: RoomId,
 ) -> Result<Vec<String>, ruma_client::Error> {
@@ -425,14 +395,16 @@ fn hash(builder: &BuildHasher<Hasher = DefaultHasher>, x: &impl Hash) -> u64 {
     hasher.finish()
 }
 
-#[async]
-pub fn crawl<C: Connect>(client: Client<C>) -> Result<(usize, usize, usize), ruma_client::Error> {
+pub async fn crawl<C: Connect + 'static>(
+    client: Client<C>,
+) -> Result<(usize, usize, usize), ruma_client::Error> {
     // * ignore ourself and voyager, as we are in all rooms but silent, so we won't send messages in the simulation
     // * weho.st and disroot.org requested to opt out as whole server, this will lead to an
     //   anonymized graph in which those servers and the users on them never existed.
     let member_ignore_pattern = regex::Regex::new(
         r"^(@.*:dsn-traveller.dsn.scc.kit.edu|@voyager:t2bot.io|@.*:weho.st|@.*:disroot.org)$",
-    ).unwrap();
+    )
+    .unwrap();
 
     let joined_rooms = await!(joined_rooms(client.clone()))?;
     let mut graph: Graph<Node, (), petgraph::Undirected> = Graph::new_undirected();
@@ -521,8 +493,7 @@ pub fn crawl<C: Connect>(client: Client<C>) -> Result<(usize, usize, usize), rum
     Ok((room_indexes.len(), user_indexes.len(), server_indexes.len()))
 }
 
-#[async]
-pub fn exit_all<C: Connect>(
+pub async fn exit_all<C: Connect + 'static>(
     client: Client<C>,
     control_room: RoomId,
 ) -> Result<(usize, usize), ruma_client::Error> {
@@ -553,8 +524,10 @@ pub fn exit_all<C: Connect>(
     Ok((left_count, joined_count))
 }
 
-#[async]
-pub fn exit<C: Connect>(client: Client<C>, room_id: RoomId) -> Result<(), ruma_client::Error> {
+pub async fn exit<C: Connect + 'static>(
+    client: Client<C>,
+    room_id: RoomId,
+) -> Result<(), ruma_client::Error> {
     // leaving as well as forgetting so that the server could part the federation for that rooms.
     // Also, if we would not forget leaved rooms, they would appear as rooms where the bot has been
     // kicked from on a later join run.
