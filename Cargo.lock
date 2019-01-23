@@ -212,7 +212,7 @@ dependencies = [
  "ron 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "ruma-client 0.1.0 (git+https://github.com/florianjacob/ruma-client?branch=supercombiner)",
  "ruma-events 0.9.0 (git+https://github.com/florianjacob/ruma-events?branch=supercombiner)",
- "ruma-identifiers 0.11.0 (git+https://github.com/fest-im/ruma-identifiers?branch=synapse-workarounds)",
+ "ruma-identifiers 0.11.0 (git+https://github.com/ruma/ruma-identifiers?branch=synapse-workarounds)",
  "serde 1.0.59 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.59 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.17 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -735,8 +735,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "regex"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "aho-corasick 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memchr 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "regex-syntax 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "thread_local 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "utf8-ranges 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "regex-syntax"
 version = "0.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "ucd-util 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "regex-syntax"
+version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "ucd-util 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -793,7 +813,7 @@ dependencies = [
 [[package]]
 name = "ruma-api-macros"
 version = "0.1.0"
-source = "git+https://github.com/florianjacob/ruma-api-macros?branch=backport-fix-statuscode#d66394d59639bf9bf872e4d36be2701a0763be1b"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "ruma-api 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -812,7 +832,7 @@ dependencies = [
  "native-tls 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "ruma-api 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ruma-client-api 0.1.0 (git+https://github.com/florianjacob/ruma-client-api?branch=supercombiner)",
- "ruma-identifiers 0.11.0 (git+https://github.com/fest-im/ruma-identifiers?branch=synapse-workarounds)",
+ "ruma-identifiers 0.11.0 (git+https://github.com/ruma/ruma-identifiers?branch=synapse-workarounds)",
  "serde_json 1.0.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_urlencoded 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -827,9 +847,9 @@ dependencies = [
  "futures 0.1.21 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.11.27 (registry+https://github.com/rust-lang/crates.io-index)",
  "ruma-api 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ruma-api-macros 0.1.0 (git+https://github.com/florianjacob/ruma-api-macros?branch=backport-fix-statuscode)",
+ "ruma-api-macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ruma-events 0.9.0 (git+https://github.com/florianjacob/ruma-events?branch=supercombiner)",
- "ruma-identifiers 0.11.0 (git+https://github.com/fest-im/ruma-identifiers?branch=synapse-workarounds)",
+ "ruma-identifiers 0.11.0 (git+https://github.com/ruma/ruma-identifiers?branch=synapse-workarounds)",
  "ruma-signatures 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.59 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.59 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -843,7 +863,7 @@ name = "ruma-events"
 version = "0.9.0"
 source = "git+https://github.com/florianjacob/ruma-events?branch=supercombiner#2263fcd89c9a4e67bde17c1fb3e441f913962ca0"
 dependencies = [
- "ruma-identifiers 0.11.0 (git+https://github.com/fest-im/ruma-identifiers?branch=synapse-workarounds)",
+ "ruma-identifiers 0.11.0 (git+https://github.com/ruma/ruma-identifiers?branch=synapse-workarounds)",
  "ruma-signatures 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.59 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.59 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -853,11 +873,11 @@ dependencies = [
 [[package]]
 name = "ruma-identifiers"
 version = "0.11.0"
-source = "git+https://github.com/fest-im/ruma-identifiers?branch=synapse-workarounds#3e6cede110fdec2962f0c0861e2a16d386b31768"
+source = "git+https://github.com/ruma/ruma-identifiers?branch=synapse-workarounds#7585fce5e477069ef2fc486e402d7c929eb4f3b6"
 dependencies = [
- "lazy_static 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)",
- "regex 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "regex 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.59 (registry+https://github.com/rust-lang/crates.io-index)",
  "url 1.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1480,17 +1500,19 @@ dependencies = [
 "checksum redox_syscall 0.1.38 (registry+https://github.com/rust-lang/crates.io-index)" = "0a12d51a5b5fd700e6c757f15877685bfa04fd7eb60c108f01d045cafa0073c2"
 "checksum redox_termios 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7e891cfe48e9100a70a3b6eb652fef28920c117d366339687bd5576160db0f76"
 "checksum regex 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)" = "9329abc99e39129fcceabd24cf5d85b4671ef7c29c50e972bc5afe32438ec384"
+"checksum regex 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "5bbbea44c5490a1e84357ff28b7d518b4619a159fed5d25f6c1de2d19cc42814"
 "checksum regex-syntax 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)" = "7d707a4fa2637f2dca2ef9fd02225ec7661fe01a53623c1e6515b6916511f7a7"
+"checksum regex-syntax 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)" = "4e47a2ed29da7a9e1960e1639e7a982e6edc6d49be308a3b02daf511504a16d1"
 "checksum relay 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "1576e382688d7e9deecea24417e350d3062d97e32e45d70b1cde65994ff1489a"
 "checksum remove_dir_all 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "3488ba1b9a2084d38645c4c08276a1752dcbf2c7130d74f1569681ad5d2799c5"
 "checksum ring 0.9.7 (registry+https://github.com/rust-lang/crates.io-index)" = "24293de46bac74c9b9c05b40ff8496bbc8b9ae242a9b89f754e1154a43bc7c4c"
 "checksum ron 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "724e7f09f9ee39398f9da98141e7250308dff027f48020d5c41b08bfb2536ee4"
 "checksum ruma-api 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5476c9703549f0ccb8b8cb208addd6b16ed1464226d884168537f5b90985afb3"
-"checksum ruma-api-macros 0.1.0 (git+https://github.com/florianjacob/ruma-api-macros?branch=backport-fix-statuscode)" = "<none>"
+"checksum ruma-api-macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a7a122639190f7a7301ba180f31ce888b287c01880d3d34cc0e32a927d44548a"
 "checksum ruma-client 0.1.0 (git+https://github.com/florianjacob/ruma-client?branch=supercombiner)" = "<none>"
 "checksum ruma-client-api 0.1.0 (git+https://github.com/florianjacob/ruma-client-api?branch=supercombiner)" = "<none>"
 "checksum ruma-events 0.9.0 (git+https://github.com/florianjacob/ruma-events?branch=supercombiner)" = "<none>"
-"checksum ruma-identifiers 0.11.0 (git+https://github.com/fest-im/ruma-identifiers?branch=synapse-workarounds)" = "<none>"
+"checksum ruma-identifiers 0.11.0 (git+https://github.com/ruma/ruma-identifiers?branch=synapse-workarounds)" = "<none>"
 "checksum ruma-signatures 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "895d8e7044367c451347f4a0327b7df1bf14a66ed6345ce431c4e8d01cdcb535"
 "checksum safemem 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e27a8b19b835f7aea908818e871f5cc3a5a186550c30773be987e155e8163d8f"
 "checksum schannel 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)" = "85fd9df495640643ad2d00443b3d78aae69802ad488debab4f1dd52fc1806ade"

@@ -35,17 +35,9 @@ git = "https://github.com/florianjacob/ruma-events"
 branch = "supercombiner"
 
 [dependencies.ruma-identifiers]
-git = "https://github.com/fest-im/ruma-identifiers"
+git = "https://github.com/ruma/ruma-identifiers"
 branch = "synapse-workarounds"
 
-# [patch.'https://github.com/musoke/ruma-client-api']
-# ruma-client-api = { git = "https://github.com/florianjacob/ruma-client-api", branch = 'supercombiner' }
-# ruma-client-api = { path = "../ruma-client-api" }
-
 [patch.crates-io]
-# ruma-events = { git = 'https://github.com/fest-im/ruma-events', branch = 'synapse-workarounds' }
-# ruma-events = { path = "../ruma-events" }
 ruma-events = { git = 'https://github.com/florianjacob/ruma-events', branch = 'supercombiner' }
-ruma-identifiers = { git = 'https://github.com/fest-im/ruma-identifiers', branch = 'synapse-workarounds' }
-# ruma-api-macros = { path = "../ruma-api-macros" }
-ruma-api-macros = { git = 'https://github.com/florianjacob/ruma-api-macros', branch = 'backport-fix-statuscode' }
+ruma-identifiers = { git = 'https://github.com/ruma/ruma-identifiers', branch = 'synapse-workarounds' }
