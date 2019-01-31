@@ -1,12 +1,3 @@
-extern crate petgraph;
-extern crate petgraph_graphml;
-extern crate rand;
-extern crate serde;
-#[macro_use]
-extern crate serde_derive;
-extern crate chrono;
-extern crate serde_json;
-
 use chrono::prelude::*;
 use petgraph::dot::{Config, Dot};
 use petgraph::prelude::*;
@@ -22,6 +13,8 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::hash_map::RandomState;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash, Hasher};
+
+use serde::{Deserialize, Serialize};
 
 pub type Graph = petgraph::Graph<Node, (), petgraph::Undirected>;
 

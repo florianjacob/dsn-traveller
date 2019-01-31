@@ -1,43 +1,34 @@
-#![feature(generators)]
-#![feature(proc_macro, proc_macro_non_items)]
 #![feature(try_from)]
+// enable the await! macro, async support, and the new std::Futures api.
+#![feature(await_macro, async_await, futures_api)]
 
-extern crate futures_await as futures;
-extern crate hostname;
-extern crate hyper;
-extern crate hyper_tls;
-extern crate ruma_client;
-extern crate ruma_identifiers;
-extern crate tokio_core;
-extern crate url;
-
-#[macro_use]
-extern crate clap;
-
-extern crate dsn_traveller;
-
-#[macro_use]
-extern crate serde_derive;
-extern crate ron;
-extern crate serde;
-extern crate url_serde;
-
+use futures::Future as OldFuture;
 use std::convert::TryFrom;
 use std::fs;
+use std::future::Future;
 use std::io;
 use std::io::prelude::*;
 use std::iter::FromIterator;
 
-use clap::{App, Arg, SubCommand};
+use clap::{crate_authors, crate_version, App, Arg, SubCommand};
 
-use futures::prelude::*;
 use ruma_client::{Client, Session};
 use ruma_identifiers::{RoomAliasId, RoomId, RoomIdOrAliasId, UserId};
-use tokio_core::reactor::{Core, Handle};
 use url::Url;
+
+use serde::{Deserialize, Serialize};
 
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
+
+// Source: https://jsdw.me/posts/rust-asyncawait-preview/
+// converts from an old style Future to a new style one:
+fn forward<I, E>(
+    f: impl OldFuture<Item = I, Error = E> + Unpin,
+) -> impl Future<Output = Result<I, E>> {
+    use tokio_async_await::compat::forward::IntoAwaitable;
+    f.into_awaitable()
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct TravellerConfig {
@@ -135,143 +126,166 @@ fn get_config() -> TravellerConfig {
     }
 }
 
-fn get_client(
-    tokio_handle: &Handle,
+async fn get_client(
     config: &TravellerConfig,
-) -> impl Future<Item = Client<HttpsConnector<HttpConnector>>, Error = ruma_client::Error> {
+) -> Result<Client<HttpsConnector<HttpConnector>>, ruma_client::Error> {
     let mut needs_login = false;
 
     let client = match load_session() {
-        Ok(session) => {
-            Client::https(tokio_handle, config.homeserver_url.clone(), Some(session)).unwrap()
-        },
+        Ok(session) => Client::https(config.homeserver_url.clone(), Some(session)).unwrap(),
         Err(_) => {
             needs_login = true;
-            Client::https(tokio_handle, config.homeserver_url.clone(), None).unwrap()
+            Client::https(config.homeserver_url.clone(), None).unwrap()
         },
     };
 
-    async_block! {
-        if needs_login {
-            print!("username: ");
-            io::stdout().flush().unwrap();
-            let mut username = String::new();
-            io::stdin().read_line(&mut username).unwrap();
-            let username = String::from(username.trim());
+    if needs_login {
+        print!("username: ");
+        io::stdout().flush().unwrap();
+        let mut username = String::new();
+        io::stdin().read_line(&mut username).unwrap();
+        let username = String::from(username.trim());
 
-            print!("password: ");
-            io::stdout().flush().unwrap();
-            let mut password = String::new();
-            io::stdin().read_line(&mut password).unwrap();
-            let password = String::from(password.trim());
+        print!("password: ");
+        io::stdout().flush().unwrap();
+        let mut password = String::new();
+        io::stdin().read_line(&mut password).unwrap();
+        let password = String::from(password.trim());
 
-            let device_id = format!("rust-dsn-traveller on {}", hostname::get_hostname().unwrap());
+        let device_id = format!(
+            "rust-dsn-traveller on {}",
+            hostname::get_hostname().unwrap()
+        );
 
-            await!(client.log_in(username, password, Some(device_id))).unwrap();
-            store_session(client.session()).unwrap();
-            eprintln!("Logged in.");
-        }
-        Ok(client)
+        let session = await!(forward(client.log_in(username, password, Some(device_id)))).unwrap();
+        store_session(session).unwrap();
+        eprintln!("Logged in.");
     }
+    Ok(client)
 }
 
-fn join(
-    tokio_handle: Handle,
-    room_list: Vec<String>,
-) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
+async fn join(room_list: Vec<String>) -> Result<(), ruma_client::Error> {
     let config = get_config();
+    let client = await!(get_client(&config))?;
 
-    async_block! {
-        let client = await!(get_client(&tokio_handle, &config))?;
+    let room_aliases = Vec::from_iter(room_list.into_iter().map(|room| {
+        RoomAliasId::try_from(&room[..]).unwrap_or_else(|_| panic!("invalid room alias: {}", room))
+    }));
 
-        let room_aliases = Vec::from_iter(room_list.into_iter()
-                                          .map(|room| RoomAliasId::try_from(&room[..]).expect(&format!("invalid room alias: {}", room)))
-                                         );
+    let (join_count, invite_count, leave_count) =
+        await!(dsn_traveller::join_rooms(client.clone(), room_aliases))?;
+    eprintln!("finished joining rooms");
 
-        let (join_count, invite_count, leave_count) = await!(dsn_traveller::join_rooms(client.clone(), room_aliases))?;
-        eprintln!("finished joining rooms");
+    let message = format!("Good evening, Gentlemen! \
+        Today I learned about {} new rooms, was invited to {} new rooms, and I'm not a member of {} rooms.",
+        join_count, invite_count, leave_count);
 
-        let message = format!("Good evening, Gentlemen! \
-            Today I learned about {} new rooms, was invited to {} new rooms, and I'm not a member of {} rooms.",
-            join_count, invite_count, leave_count);
+    let control_room_id = await!(dsn_traveller::into_room_id(
+        client.clone(),
+        config.control_room.clone()
+    ))
+    .expect("Could not resolve control room alias");
 
-        let control_room_id = await!(dsn_traveller::into_room_id(client.clone(), config.control_room.clone())).expect("Could not resolve control room alias");
+    await!(dsn_traveller::send_message(
+        client.clone(),
+        control_room_id,
+        message.clone()
+    ))?;
+    eprintln!("{}", message);
 
-        await!(dsn_traveller::send_message(client.clone(), control_room_id, message.clone()))?;
-        eprintln!("{}", message);
-
-        Ok(())
-    }
+    Ok(())
 }
 
-fn crawl(tokio_handle: Handle) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
+async fn crawl() -> Result<(), ruma_client::Error> {
     let config = get_config();
+    let client = await!(get_client(&config))?;
 
-    async_block! {
-        let client = await!(get_client(&tokio_handle, &config))?;
+    let (room_count, user_count, server_count) = await!(dsn_traveller::crawl(client.clone()))?;
+    eprintln!("queried room membership");
 
-        let (room_count, user_count, server_count) = await!(dsn_traveller::crawl(client.clone()))?;
-        eprintln!("queried room membership");
+    let message = format!(
+        "Good evening, Gentlemen! \
+         On my travelling, I visited {} rooms on {} different servers, and saw {} people!",
+        room_count, server_count, user_count,
+    );
 
-        let message = format!("Good evening, Gentlemen! \
-            On my travelling, I visited {} rooms on {} different servers, and saw {} people!",
-            room_count, server_count, user_count,);
+    let control_room_id = await!(dsn_traveller::into_room_id(
+        client.clone(),
+        config.control_room.clone()
+    ))
+    .expect("Could not resolve control room alias");
 
-        let control_room_id = await!(dsn_traveller::into_room_id(client.clone(), config.control_room.clone())).expect("Could not resolve control room alias");
+    await!(dsn_traveller::send_message(
+        client.clone(),
+        control_room_id,
+        message.clone()
+    ))?;
+    eprintln!("{}", message);
 
-        await!(dsn_traveller::send_message(client.clone(), control_room_id, message.clone()))?;
-        eprintln!("{}", message);
-
-        Ok(())
-    }
+    Ok(())
 }
 
-fn exit_all(tokio_handle: Handle) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
+async fn exit_all() -> Result<(), ruma_client::Error> {
     let config = get_config();
 
-    async_block! {
-        let client = await!(get_client(&tokio_handle, &config))?;
+    let client = await!(get_client(&config))?;
 
-        let control_room_id = await!(dsn_traveller::into_room_id(client.clone(), config.control_room.clone())).expect("Could not resolve control room alias");
+    let control_room_id = await!(dsn_traveller::into_room_id(
+        client.clone(),
+        config.control_room.clone()
+    ))
+    .expect("Could not resolve control room alias");
 
-        let (left_count, joined_count) = await!(dsn_traveller::exit_all(client.clone(), control_room_id.clone()))?;
+    let (left_count, joined_count) = await!(dsn_traveller::exit_all(
+        client.clone(),
+        control_room_id.clone()
+    ))?;
 
-        let message = format!("Good bye, Gentlemen! \
-            Today, I departed from {} of the {} rooms I visited.",
-            left_count, joined_count);
+    let message = format!(
+        "Good bye, Gentlemen! \
+         Today, I departed from {} of the {} rooms I visited.",
+        left_count, joined_count
+    );
 
-        await!(dsn_traveller::send_message(client.clone(), control_room_id, message.clone()))?;
-        eprintln!("{}", message);
+    await!(dsn_traveller::send_message(
+        client.clone(),
+        control_room_id,
+        message.clone()
+    ))?;
+    eprintln!("{}", message);
 
-        Ok(())
-    }
+    Ok(())
 }
 
-fn exit(
-    tokio_handle: Handle,
-    room_id: RoomId,
-) -> impl Future<Item = (), Error = ruma_client::Error> + 'static {
+async fn exit(room_id: RoomId) -> Result<(), ruma_client::Error> {
     let config = get_config();
+    let client = await!(get_client(&config))?;
 
-    async_block! {
-        let client = await!(get_client(&tokio_handle, &config))?;
+    let control_room_id = await!(dsn_traveller::into_room_id(
+        client.clone(),
+        config.control_room.clone()
+    ))
+    .expect("Could not resolve control room alias");
 
-        let control_room_id = await!(dsn_traveller::into_room_id(client.clone(), config.control_room.clone())).expect("Could not resolve control room alias");
+    let message = match await!(dsn_traveller::exit(client.clone(), room_id.clone())) {
+        Ok(_) => format!(
+            "Good bye, Gentlemen! Today, I successfully departed from room {}.",
+            room_id
+        ),
+        Err(e) => format!(
+            "Gentlemen, there was a hitch with leaving from room {}! {:?}",
+            room_id, e
+        ),
+    };
 
-        let message = match await!(dsn_traveller::exit(client.clone(), room_id.clone())) {
-            Ok(_) => {
-                format!("Good bye, Gentlemen! Today, I successfully departed from room {}.", room_id)
-            },
-            Err(e) => {
-                format!("Gentlemen, there was a hitch with leaving from room {}! {:?}", room_id, e)
-            },
-        };
+    await!(dsn_traveller::send_message(
+        client.clone(),
+        control_room_id,
+        message.clone()
+    ))?;
+    eprintln!("{}", message);
 
-        await!(dsn_traveller::send_message(client.clone(), control_room_id, message.clone()))?;
-        eprintln!("{}", message);
-
-        Ok(())
-    }
+    Ok(())
 }
 
 fn main() {
@@ -303,17 +317,11 @@ fn main() {
                    )
         .get_matches();
 
-    let mut core = Core::new().unwrap();
-    let handle = core.handle().clone();
-
-    let future = async_block! {
+    let future = async move {
         match matches.subcommand() {
-            ("join", Some(_)) => {
+            // ("join", Some(_)) => {
+            ("join", Some(join_matches)) => {
                 let room_list: Vec<String> = {
-                    // would need non-lexical lifetimes to use the ("join", Some(join_matches))
-                    // as that borrow will not end before the await, running in a
-                    // "borrow may still be in use when generator yields"
-                    let join_matches = matches.subcommand_matches("join").unwrap();
                     if join_matches.is_present("stdin") {
                         let stdin = io::stdin();
                         let lines = stdin.lock().lines().map(|line| line.unwrap());
@@ -326,34 +334,32 @@ fn main() {
                     }
                 };
 
-                await!(join(handle, room_list))
+                await!(join(room_list)).unwrap();
             },
-            ("crawl", Some(_)) => await!(crawl(handle)),
-            ("exit", Some(_)) => {
+            ("crawl", Some(_)) => await!(crawl()).unwrap(),
+            ("exit", Some(exit_matches)) => {
                 let room_id = {
-                    let exit_matches = matches.subcommand_matches("exit").unwrap();
                     if exit_matches.is_present("room_id") {
                         let room_id = exit_matches.value_of("room_id").unwrap();
-                        let room_id = RoomId::try_from(room_id).expect("Unable to parse given RoomId");
+                        let room_id =
+                            RoomId::try_from(room_id).expect("Unable to parse given RoomId");
                         Some(room_id)
                     } else {
                         None
                     }
                 };
                 if let Some(room_id) = room_id {
-                    await!(exit(handle, room_id))
-                }
-                else {
-                    await!(exit_all(handle))
+                    await!(exit(room_id)).unwrap();
+                } else {
+                    await!(exit_all()).unwrap();
                 }
             },
             ("", None) => {
                 eprintln!("No subcommand given.");
-                Ok(())
             },
             _ => unreachable!(),
         }
     };
 
-    core.run(future).unwrap();
+    tokio::run_async(future);
 }
