@@ -153,20 +153,12 @@ async fn sync_rooms<C: Connect + 'static>(
         room: Some(room_filter.clone()),
         presence: Some(filter_all.clone()),
     };
-    let filter_string =
-        serde_json::to_string(&filter_definition).expect("filter json serialization failed");
 
     use r0::sync::sync_events;
     let response = await!(sync_events::call(
         client.clone(),
         sync_events::Request {
-            // This does not work, as the serde_urlencoded can't treat the complex struct,
-            // in needs to be converted to json first before serde_urlencoded gets it
-            // filter: Some(sync_events::Filter::FilterDefinition(filter_definition)),
-            // ISSUE: https://github.com/ruma/ruma-api-macros/issues/3
-            // HACK: the server tells by the leading '{' whether it's json or not,
-            // so we can actually to the conversion ourselves upfront without telling ruma-client
-            filter: Some(sync_events::Filter::FilterId(filter_string)),
+            filter: Some(sync_events::Filter::FilterDefinition(filter_definition)),
             since: None,
             full_state: Some(true),
             set_presence: None,
