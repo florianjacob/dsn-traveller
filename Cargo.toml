@@ -46,5 +46,3 @@ ruma-identifiers = { git = 'https://github.com/ruma/ruma-identifiers', branch = 
 # need to patch ruma-client until next release (after 0.2.0) of ruma-client-api
 # also, needed for fixed Filter argument (de)serialization
 ruma-client-api = { git = 'https://github.com/ruma/ruma-client-api', branch = 'master' }
-# need to patch ruma-api-macros for ron compatibility until next release (after 0.3.0)
-ruma-api-macros = { git = 'https://github.com/ruma/ruma-api-macros', branch = 'import-fix' }
