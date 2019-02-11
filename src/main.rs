@@ -13,7 +13,7 @@ use std::iter::FromIterator;
 use clap::{crate_authors, crate_version, App, Arg, SubCommand};
 
 use ruma_client::{Client, Session};
-use ruma_identifiers::{RoomAliasId, RoomId, RoomIdOrAliasId, UserId};
+use ruma_identifiers::{RoomAliasId, RoomId, RoomIdOrAliasId};
 use url::Url;
 
 use serde::{Deserialize, Serialize};
@@ -37,32 +37,6 @@ struct TravellerConfig {
     control_room: RoomIdOrAliasId,
 }
 
-// copy of ruma_client::Session for deriving debug & deserialize
-// alternative would be https://serde.rs/remote-derive.html, but that looks much more cumbersome,
-// especially as ruma_client::Session will probably implement Serialize, Deserialize itself
-// eventually.
-#[derive(Serialize, Deserialize, Debug)]
-struct StoredSession {
-    access_token: String,
-    user_id: UserId,
-    device_id: String,
-}
-impl From<Session> for StoredSession {
-    fn from(session: Session) -> Self {
-        StoredSession {
-            access_token: session.access_token().into(),
-            user_id: session.user_id().clone(),
-            device_id: session.device_id().into(),
-        }
-    }
-}
-
-impl Into<Session> for StoredSession {
-    fn into(self) -> Session {
-        Session::new(self.access_token, self.user_id, self.device_id)
-    }
-}
-
 fn load_config() -> Result<TravellerConfig, io::Error> {
     let file = fs::File::open("config.ron")?;
     let reader = io::BufReader::new(file);
@@ -84,15 +58,14 @@ fn store_config(config: &TravellerConfig) -> Result<(), io::Error> {
 fn load_session() -> Result<Session, io::Error> {
     let file = fs::File::open("session.ron")?;
     let reader = io::BufReader::new(file);
-    let session: StoredSession =
+    let session =
         ron::de::from_reader(reader).expect("could not deserialize session.ron");
-    Ok(session.into())
+    Ok(session)
 }
 
 fn store_session(session: Session) -> Result<(), io::Error> {
     let file = fs::File::create("session.ron")?;
     let mut buffer = io::BufWriter::new(file);
-    let session: StoredSession = session.into();
     write!(
         &mut buffer,
         "{}",

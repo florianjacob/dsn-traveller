@@ -33,15 +33,16 @@ branch = "joined_rooms"
 
 [dependencies.ruma-events]
 git = "https://github.com/florianjacob/ruma-events"
-branch = "hypercombiner"
+branch = "null-absent-empty"
 
 [dependencies.ruma-identifiers]
-git = "https://github.com/ruma/ruma-identifiers"
-branch = "synapse-workarounds"
+version = "0.11"
+# git = "https://github.com/ruma/ruma-identifiers"
+# branch = "synapse-workarounds"
 
 [patch.crates-io]
-ruma-events = { git = 'https://github.com/florianjacob/ruma-events', branch = 'hypercombiner' }
-ruma-identifiers = { git = 'https://github.com/ruma/ruma-identifiers', branch = 'synapse-workarounds' }
+ruma-events = { git = 'https://github.com/florianjacob/ruma-events', branch = 'null-absent-empty' }
+# ruma-identifiers = { git = 'https://github.com/ruma/ruma-identifiers', branch = 'synapse-workarounds' }
 # need to patch ruma-client until next release (after 0.2.0) of ruma-client-api
 # also, needed for fixed Filter argument (de)serialization
 ruma-client-api = { git = 'https://github.com/ruma/ruma-client-api', branch = 'master' }
