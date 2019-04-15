@@ -7,8 +7,8 @@ edition = "2018"
 
 [dependencies]
 futures = "0.1"
-tokio = { version = "0.1", features = ["async-await-preview"] }
-tokio-async-await = "0.1"
+# tokio = { version = "0.1.18", features = ["async-await-preview"] }
+# tokio-async-await = "0.1"
 futures-timer = "0.1"
 url = "1"
 hyper = "0.12"
@@ -27,22 +27,18 @@ ron = "0.4"
 regex = "1"
 lazy_static = "1"
 
-[dependencies.ruma-client]
-git = "https://github.com/florianjacob/ruma-client"
-branch = "joined_rooms"
+ruma-client = "0.2"
+ruma-events = "0.12"
+ruma-identifiers = "0.12"
 
-[dependencies.ruma-events]
-git = "https://github.com/florianjacob/ruma-events"
-branch = "null-absent-empty"
+[dependencies.tokio]
+git = "https://github.com/tokio-rs/tokio"
+branch = "master"
+features = ["async-await-preview"]
 
-[dependencies.ruma-identifiers]
-version = "0.11"
-# git = "https://github.com/ruma/ruma-identifiers"
-# branch = "synapse-workarounds"
+[dependencies.tokio-async-await]
+git = "https://github.com/tokio-rs/tokio"
+branch = "master"
 
 [patch.crates-io]
-ruma-events = { git = 'https://github.com/florianjacob/ruma-events', branch = 'null-absent-empty' }
-# ruma-identifiers = { git = 'https://github.com/ruma/ruma-identifiers', branch = 'synapse-workarounds' }
-# need to patch ruma-client until next release (after 0.2.0) of ruma-client-api
-# also, needed for fixed Filter argument (de)serialization
-ruma-client-api = { git = 'https://github.com/ruma/ruma-client-api', branch = 'master' }
+tokio-async-await = { git = "https://github.com/tokio-rs/tokio", branch = "master" }
