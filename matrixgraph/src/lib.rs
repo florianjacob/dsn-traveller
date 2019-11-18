@@ -51,7 +51,7 @@ impl fmt::Display for NoEdgeData {
     }
 }
 
-fn hash_with_salt(builder: &BuildHasher<Hasher = DefaultHasher>, x: &impl Hash, salt: u64) -> u64 {
+fn hash_with_salt(builder: &dyn BuildHasher<Hasher = DefaultHasher>, x: &impl Hash, salt: u64) -> u64 {
     let mut hasher = builder.build_hasher();
     x.hash(&mut hasher);
     salt.hash(&mut hasher);

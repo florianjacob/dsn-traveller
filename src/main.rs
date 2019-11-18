@@ -1,37 +1,22 @@
-// enable the await! macro, async support, and the new std::Futures api.
-#![feature(await_macro, async_await, futures_api)]
-
-use futures::Future as OldFuture;
 use std::convert::TryFrom;
 use std::fs;
-use std::future::Future;
 use std::io;
 use std::io::prelude::*;
 use std::iter::FromIterator;
 
 use clap::{crate_authors, crate_version, App, Arg, SubCommand};
 
-use ruma_client::{Client, Session};
-use ruma_identifiers::{RoomAliasId, RoomId, RoomIdOrAliasId};
+use ruma_client::{
+    HttpsClient, Session,
+    identifiers::{RoomAliasId, RoomId, RoomIdOrAliasId},
+};
 use url::Url;
 
 use serde::{Deserialize, Serialize};
 
-use hyper::client::HttpConnector;
-use hyper_tls::HttpsConnector;
-
-// Source: https://jsdw.me/posts/rust-asyncawait-preview/
-// converts from an old style Future to a new style one:
-fn forward<I, E>(
-    f: impl OldFuture<Item = I, Error = E> + Unpin,
-) -> impl Future<Output = Result<I, E>> {
-    use tokio_async_await::compat::forward::IntoAwaitable;
-    f.into_awaitable()
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct TravellerConfig {
-    #[serde(with = "url_serde")]
     homeserver_url: Url,
     control_room: RoomIdOrAliasId,
 }
@@ -100,14 +85,14 @@ fn get_config() -> TravellerConfig {
 
 async fn get_client(
     config: &TravellerConfig,
-) -> Result<Client<HttpsConnector<HttpConnector>>, ruma_client::Error> {
+) -> Result<HttpsClient, ruma_client::Error> {
     let mut needs_login = false;
 
     let client = match load_session() {
-        Ok(session) => Client::https(config.homeserver_url.clone(), Some(session)).unwrap(),
+        Ok(session) => HttpsClient::https(config.homeserver_url.clone(), Some(session)).unwrap(),
         Err(_) => {
             needs_login = true;
-            Client::https(config.homeserver_url.clone(), None).unwrap()
+            HttpsClient::https(config.homeserver_url.clone(), None).unwrap()
         },
     };
 
@@ -129,7 +114,7 @@ async fn get_client(
             hostname::get_hostname().unwrap()
         );
 
-        let session = await!(forward(client.log_in(username, password, Some(device_id)))).unwrap();
+        let session = client.log_in(username, password, Some(device_id)).await.unwrap();
         store_session(session).unwrap();
         eprintln!("Logged in.");
     }
@@ -138,31 +123,31 @@ async fn get_client(
 
 async fn join(room_list: Vec<String>) -> Result<(), ruma_client::Error> {
     let config = get_config();
-    let client = await!(get_client(&config))?;
+    let client = get_client(&config).await?;
 
     let room_aliases = Vec::from_iter(room_list.into_iter().map(|room| {
         RoomAliasId::try_from(&room[..]).unwrap_or_else(|_| panic!("invalid room alias: {}", room))
     }));
 
     let (join_count, invite_count, leave_count) =
-        await!(dsn_traveller::join_rooms(client.clone(), room_aliases))?;
+        dsn_traveller::join_rooms(client.clone(), room_aliases).await?;
     eprintln!("finished joining rooms");
 
     let message = format!("Good evening, Gentlemen! \
         Today I learned about {} new rooms, was invited to {} new rooms, and I'm not a member of {} rooms.",
         join_count, invite_count, leave_count);
 
-    let control_room_id = await!(dsn_traveller::into_room_id(
+    let control_room_id = dsn_traveller::into_room_id(
         client.clone(),
         config.control_room.clone()
-    ))
-    .expect("Could not resolve control room alias");
+    )
+    .await.expect("Could not resolve control room alias");
 
-    await!(dsn_traveller::send_message(
+    dsn_traveller::send_message(
         client.clone(),
         control_room_id,
         message.clone()
-    ))?;
+    ).await?;
     eprintln!("{}", message);
 
     Ok(())
@@ -170,9 +155,9 @@ async fn join(room_list: Vec<String>) -> Result<(), ruma_client::Error> {
 
 async fn crawl() -> Result<(), ruma_client::Error> {
     let config = get_config();
-    let client = await!(get_client(&config))?;
+    let client = get_client(&config).await?;
 
-    let (room_count, user_count, server_count) = await!(dsn_traveller::crawl(client.clone()))?;
+    let (room_count, user_count, server_count) = dsn_traveller::crawl(client.clone()).await?;
     eprintln!("queried room membership");
 
     let message = format!(
@@ -181,17 +166,17 @@ async fn crawl() -> Result<(), ruma_client::Error> {
         room_count, server_count, user_count,
     );
 
-    let control_room_id = await!(dsn_traveller::into_room_id(
+    let control_room_id = dsn_traveller::into_room_id(
         client.clone(),
         config.control_room.clone()
-    ))
-    .expect("Could not resolve control room alias");
+    )
+    .await .expect("Could not resolve control room alias");
 
-    await!(dsn_traveller::send_message(
+    dsn_traveller::send_message(
         client.clone(),
         control_room_id,
         message.clone()
-    ))?;
+    ).await?;
     eprintln!("{}", message);
 
     Ok(())
@@ -200,18 +185,18 @@ async fn crawl() -> Result<(), ruma_client::Error> {
 async fn exit_all() -> Result<(), ruma_client::Error> {
     let config = get_config();
 
-    let client = await!(get_client(&config))?;
+    let client = get_client(&config).await?;
 
-    let control_room_id = await!(dsn_traveller::into_room_id(
+    let control_room_id = dsn_traveller::into_room_id(
         client.clone(),
         config.control_room.clone()
-    ))
-    .expect("Could not resolve control room alias");
+    )
+    .await.expect("Could not resolve control room alias");
 
-    let (left_count, joined_count) = await!(dsn_traveller::exit_all(
+    let (left_count, joined_count) = dsn_traveller::exit_all(
         client.clone(),
         control_room_id.clone()
-    ))?;
+    ).await?;
 
     let message = format!(
         "Good bye, Gentlemen! \
@@ -219,11 +204,11 @@ async fn exit_all() -> Result<(), ruma_client::Error> {
         left_count, joined_count
     );
 
-    await!(dsn_traveller::send_message(
+    dsn_traveller::send_message(
         client.clone(),
         control_room_id,
         message.clone()
-    ))?;
+    ).await?;
     eprintln!("{}", message);
 
     Ok(())
@@ -231,15 +216,15 @@ async fn exit_all() -> Result<(), ruma_client::Error> {
 
 async fn exit(room_id: RoomId) -> Result<(), ruma_client::Error> {
     let config = get_config();
-    let client = await!(get_client(&config))?;
+    let client = get_client(&config).await?;
 
-    let control_room_id = await!(dsn_traveller::into_room_id(
+    let control_room_id = dsn_traveller::into_room_id(
         client.clone(),
         config.control_room.clone()
-    ))
-    .expect("Could not resolve control room alias");
+    )
+    .await.expect("Could not resolve control room alias");
 
-    let message = match await!(dsn_traveller::exit(client.clone(), room_id.clone())) {
+    let message = match dsn_traveller::exit(client.clone(), room_id.clone()).await {
         Ok(_) => format!(
             "Good bye, Gentlemen! Today, I successfully departed from room {}.",
             room_id
@@ -250,17 +235,18 @@ async fn exit(room_id: RoomId) -> Result<(), ruma_client::Error> {
         ),
     };
 
-    await!(dsn_traveller::send_message(
+    dsn_traveller::send_message(
         client.clone(),
         control_room_id,
         message.clone()
-    ))?;
+    ).await?;
     eprintln!("{}", message);
 
     Ok(())
 }
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), ruma_client::Error> {
     let matches = App::new("DSN Traveller")
         .version(crate_version!())
         .author(crate_authors!())
@@ -289,49 +275,47 @@ fn main() {
                    )
         .get_matches();
 
-    let future = async move {
-        match matches.subcommand() {
-            // ("join", Some(_)) => {
-            ("join", Some(join_matches)) => {
-                let room_list: Vec<String> = {
-                    if join_matches.is_present("stdin") {
-                        let stdin = io::stdin();
-                        let lines = stdin.lock().lines().map(|line| line.unwrap());
-                        Vec::from_iter(lines)
-                    } else {
-                        match join_matches.values_of("room_aliases") {
-                            Some(aliases) => Vec::from_iter(aliases.map(|s| s.to_string())),
-                            None => Vec::new(),
-                        }
-                    }
-                };
-
-                await!(join(room_list)).unwrap();
-            },
-            ("crawl", Some(_)) => await!(crawl()).unwrap(),
-            ("exit", Some(exit_matches)) => {
-                let room_id = {
-                    if exit_matches.is_present("room_id") {
-                        let room_id = exit_matches.value_of("room_id").unwrap();
-                        let room_id =
-                            RoomId::try_from(room_id).expect("Unable to parse given RoomId");
-                        Some(room_id)
-                    } else {
-                        None
-                    }
-                };
-                if let Some(room_id) = room_id {
-                    await!(exit(room_id)).unwrap();
+    match matches.subcommand() {
+        // ("join", Some(_)) => {
+        ("join", Some(join_matches)) => {
+            let room_list: Vec<String> = {
+                if join_matches.is_present("stdin") {
+                    let stdin = io::stdin();
+                    let lines = stdin.lock().lines().map(|line| line.unwrap());
+                    Vec::from_iter(lines)
                 } else {
-                    await!(exit_all()).unwrap();
+                    match join_matches.values_of("room_aliases") {
+                        Some(aliases) => Vec::from_iter(aliases.map(|s| s.to_string())),
+                        None => Vec::new(),
+                    }
                 }
-            },
-            ("", None) => {
-                eprintln!("No subcommand given.");
-            },
-            _ => unreachable!(),
-        }
-    };
+            };
 
-    tokio::run_async(future);
+            join(room_list).await
+        },
+        ("crawl", Some(_)) => crawl().await,
+        ("exit", Some(exit_matches)) => {
+            let room_id = {
+                if exit_matches.is_present("room_id") {
+                    let room_id = exit_matches.value_of("room_id").unwrap();
+                    let room_id =
+                        RoomId::try_from(room_id).expect("Unable to parse given RoomId");
+                    Some(room_id)
+                } else {
+                    None
+                }
+            };
+            if let Some(room_id) = room_id {
+                exit(room_id).await
+            } else {
+                exit_all().await
+            }
+        },
+        ("", None) => {
+            eprintln!("No subcommand given.");
+            // TODO: this could be done cleaner with a custom Error type
+            std::process::exit(1)
+        },
+        _ => unreachable!(),
+    }
 }

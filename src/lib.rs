@@ -1,26 +1,22 @@
-// enable the await! macro, async support, and the new std::Futures api.
-#![feature(await_macro, async_await, futures_api)]
-
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::fmt;
 use std::iter::FromIterator;
 use std::time;
 
-use tokio::await;
-
 use futures_timer::Delay;
 use ruma_client::api::r0;
-use ruma_client::Client;
-use ruma_events::room::member::MembershipState;
-use ruma_events::room::message::{MessageEventContent, MessageType, TextMessageEventContent};
-use ruma_events::stripped::StrippedState;
-use ruma_events::EventType;
-use ruma_identifiers::{EventId, RoomAliasId, RoomId, RoomIdOrAliasId, UserId};
+use ruma_client::{
+    HttpsClient,
+    events::room::member::MembershipState,
+    events::room::message::{MessageEventContent, TextMessageEventContent},
+    events::stripped::StrippedState,
+    events::EventType,
+    events::EventResult,
+    identifiers::{EventId, RoomAliasId, RoomId, RoomIdOrAliasId, UserId},
+};
 
 use petgraph::prelude::*;
-
-use hyper::client::connect::Connect;
 
 use lazy_static::lazy_static;
 
@@ -78,103 +74,105 @@ impl fmt::Display for ServerId {
     }
 }
 
-pub async fn send_message<C: Connect + 'static>(
-    client: Client<C>,
+pub async fn send_message(
+    client: HttpsClient,
     room_id: RoomId,
     message: String,
 ) -> Result<EventId, ruma_client::Error> {
-    use r0::send::send_message_event;
-    let response = await!(send_message_event::call(
-        client.clone(),
-        send_message_event::Request {
+    let response = client.request(
+        r0::send::send_message_event::Request {
             room_id: room_id,
             event_type: EventType::RoomMessage,
             txn_id: TXN_ID.fetch_add(1, Ordering::Relaxed).to_string(),
             data: MessageEventContent::Text(TextMessageEventContent {
                 body: message,
-                msgtype: MessageType::Text,
+                format: None,
+                formatted_body: None,
+                relates_to: None,
             }),
         }
-    ))?;
+    ).await?;
     Ok(response.event_id)
 }
 
-async fn joined_rooms<C: Connect + 'static>(
-    client: Client<C>,
+async fn joined_rooms(
+    client: HttpsClient,
 ) -> Result<Vec<RoomId>, ruma_client::Error> {
-    use r0::membership::joined_rooms;
-    let response = await!(joined_rooms::call(client.clone(), joined_rooms::Request {}))?;
+    let response = client.request(
+        r0::membership::joined_rooms::Request {}).await?;
     Ok(response.joined_rooms)
 }
 
-async fn sync_rooms<C: Connect + 'static>(
-    client: Client<C>,
+async fn sync_rooms(
+    client: HttpsClient,
 ) -> Result<r0::sync::sync_events::Rooms, ruma_client::Error> {
     use r0::filter;
     let filter_all = filter::Filter {
         not_types: vec!["*".to_owned()],
         limit: None,
-        senders: Vec::new(),
-        types: Vec::new(),
+        senders: None,
+        types: None,
         not_senders: Vec::new(),
     };
     let filter_all_events = filter::RoomEventFilter {
         not_types: vec!["*".to_owned()],
-        not_rooms: Vec::new(),
         limit: None,
-        rooms: Vec::new(),
+        types: None,
+        rooms: None,
+        not_rooms: Vec::new(),
+        senders: None,
         not_senders: Vec::new(),
-        senders: Vec::new(),
-        types: Vec::new(),
     };
-    let filter_room_events = filter::RoomEventFilter {
-        not_types: Vec::new(),
-        not_rooms: Vec::new(),
+    // TODO: the current version of the spec actually has a StateFilter type
+    // -> add that in ruma
+    let only_canonical_alias = filter::RoomEventFilter {
+        // I think this defaults to limit: 10 events in synapse, but as this is state,
+        // it should return only a single event.
         limit: None,
-        rooms: Vec::new(),
+        types: Some(vec!["m.room.canonical_alias".to_owned()]),
+        not_types: Vec::new(),
+        rooms: None,
+        not_rooms: Vec::new(),
+        senders: None,
         not_senders: Vec::new(),
-        senders: Vec::new(),
-        types: vec!["m.room.canonical_alias".to_owned()],
     };
     let room_filter = filter::RoomFilter {
         include_leave: Some(true),
         account_data: Some(filter_all_events.clone()),
         timeline: Some(filter_all_events.clone()),
         ephemeral: Some(filter_all_events.clone()),
-        state: Some(filter_room_events),
+        state: Some(only_canonical_alias),
         not_rooms: Vec::new(),
-        rooms: Vec::new(),
+        rooms: None,
     };
     let filter_definition = filter::FilterDefinition {
-        event_fields: Vec::new(),
+        event_fields: None,
         event_format: None,
         account_data: Some(filter_all.clone()),
         room: Some(room_filter.clone()),
         presence: Some(filter_all.clone()),
     };
 
-    use r0::sync::sync_events;
-    let response = await!(sync_events::call(
-        client.clone(),
-        sync_events::Request {
-            filter: Some(sync_events::Filter::FilterDefinition(filter_definition)),
+    let response = client.request(
+        r0::sync::sync_events::Request {
+            filter: Some(r0::sync::sync_events::Filter::FilterDefinition(filter_definition)),
             since: None,
             full_state: Some(true),
             set_presence: None,
             timeout: None,
         }
-    ))
-    .expect("Could not get sync response");
+    )
+    .await.expect("Could not get sync response");
     eprintln!("next batch: {}", response.next_batch);
     Ok(response.rooms)
 }
 
-pub async fn join_rooms<C: Connect + 'static>(
-    client: Client<C>,
+pub async fn join_rooms(
+    client: HttpsClient,
     room_aliases: Vec<RoomAliasId>,
 ) -> Result<(usize, usize, usize), ruma_client::Error> {
     eprintln!("Syncing…");
-    let rooms = await!(sync_rooms(client.clone())).expect("error syncing");
+    let rooms = sync_rooms(client.clone()).await.expect("error syncing");
     eprintln!("Already joined rooms: {}", rooms.join.len());
     // rooms that the bot was once a member of, but either left it (bot doesn't do that),
     // was kicked or was banned. Rooms stay in here as long as I don't click on "remove" in Riot, it seems.
@@ -194,10 +192,10 @@ pub async fn join_rooms<C: Connect + 'static>(
     let invites_to_follow = rooms.invite.len();
 
     for (room_id, invite) in rooms.invite.clone().into_iter() {
-        await!(Delay::new(ROOM_JOIN_DELAY)).unwrap();
+        Delay::new(ROOM_JOIN_DELAY).await.unwrap();
         let mut canonical_alias = None;
         for event in invite.clone().invite_state.events {
-            if let StrippedState::RoomCanonicalAlias(canonical_alias_event) = event {
+            if let EventResult::Ok(StrippedState::RoomCanonicalAlias(canonical_alias_event)) = event {
                 canonical_alias = Some(canonical_alias_event.content.alias.clone().unwrap());
                 break;
             }
@@ -208,14 +206,12 @@ pub async fn join_rooms<C: Connect + 'static>(
                 eprintln!("ignoring {:?}", canonical_alias);
                 continue;
             }
-            use r0::membership::join_room_by_id_or_alias;
-            match await!(join_room_by_id_or_alias::call(
-                client.clone(),
-                join_room_by_id_or_alias::Request {
+            match client.request(
+                r0::membership::join_room_by_id_or_alias::Request {
                     room_id_or_alias: RoomIdOrAliasId::RoomAliasId(canonical_alias.clone()),
                     third_party_signed: None,
                 }
-            )) {
+            ).await {
                 Ok(_) => {
                     invite_count += 1;
                     eprintln!(
@@ -235,14 +231,12 @@ pub async fn join_rooms<C: Connect + 'static>(
                 "could resolve canonical alias for invited room {:#?}, trying to join by room id",
                 invite
             );
-            use r0::membership::join_room_by_id_or_alias;
-            match await!(join_room_by_id_or_alias::call(
-                client.clone(),
-                join_room_by_id_or_alias::Request {
+            match client.request(
+                r0::membership::join_room_by_id_or_alias::Request {
                     room_id_or_alias: RoomIdOrAliasId::RoomId(room_id.clone()),
                     third_party_signed: None,
                 }
-            )) {
+            ).await {
                 Ok(_) => {
                     invite_count += 1;
                     eprintln!(
@@ -272,7 +266,7 @@ pub async fn join_rooms<C: Connect + 'static>(
             continue;
         }
 
-        let room_id = match await!(resolve_alias(client.clone(), alias.clone())) {
+        let room_id = match resolve_alias(client.clone(), alias.clone()).await {
             Ok(room_id) => room_id,
             Err(e) => {
                 eprintln!("Could not resolve room {}: {:?}", alias, e);
@@ -285,14 +279,12 @@ pub async fn join_rooms<C: Connect + 'static>(
             && !invited_rooms_set.contains(&room_id)
             && !left_rooms_set.contains(&room_id)
         {
-            use r0::membership::join_room_by_id_or_alias;
-            match await!(join_room_by_id_or_alias::call(
-                client.clone(),
-                join_room_by_id_or_alias::Request {
+            match client.request(
+                r0::membership::join_room_by_id_or_alias::Request {
                     room_id_or_alias: RoomIdOrAliasId::RoomAliasId(alias.clone()),
                     third_party_signed: None,
                 }
-            )) {
+            ).await {
                 Ok(_) => {
                     join_count += 1;
                     eprintln!(
@@ -303,7 +295,7 @@ pub async fn join_rooms<C: Connect + 'static>(
                 Err(e) => eprintln!("Error joining room {}: {:?}", room_id, e),
             };
 
-            await!(Delay::new(ROOM_JOIN_DELAY)).expect("wait failed");
+            Delay::new(ROOM_JOIN_DELAY).await.expect("wait failed");
         } else {
             eprintln!(
                 "already joined, invited or was kicked from room {}.",
@@ -314,80 +306,73 @@ pub async fn join_rooms<C: Connect + 'static>(
     Ok((join_count, invite_count, rooms.leave.len()))
 }
 
-async fn leave_and_forget_room<C: Connect + 'static>(
-    client: Client<C>,
+async fn leave_and_forget_room(
+    client: HttpsClient,
     room_id: RoomId,
 ) -> Result<(), ruma_client::Error> {
-    use r0::membership::leave_room;
-    await!(leave_room::call(
-        client.clone(),
-        leave_room::Request {
+    client.request(
+        r0::membership::leave_room::Request {
             room_id: room_id.clone(),
         }
-    ))?;
+    ).await?;
 
-    use r0::membership::forget_room;
-    await!(forget_room::call(
-        client.clone(),
-        forget_room::Request { room_id }
-    ))?;
+    client.request(
+        r0::membership::forget_room::Request { room_id }
+    ).await?;
     Ok(())
 }
 
-pub async fn resolve_alias<C: Connect + 'static>(
-    client: Client<C>,
+pub async fn resolve_alias(
+    client: HttpsClient,
     room_alias: RoomAliasId,
 ) -> Result<RoomId, ruma_client::Error> {
-    use r0::alias::get_alias;
-    let response = await!(get_alias::call(
-        client.clone(),
-        get_alias::Request { room_alias }
-    ))?;
+    let response = client.request(
+        r0::alias::get_alias::Request { room_alias }
+    ).await?;
     Ok(response.room_id)
 }
 
-pub async fn into_room_id<C: Connect + 'static>(
-    client: Client<C>,
+pub async fn into_room_id(
+    client: HttpsClient,
     room_id_or_alias_id: RoomIdOrAliasId,
 ) -> Result<RoomId, ruma_client::Error> {
     match room_id_or_alias_id {
         RoomIdOrAliasId::RoomId(room_id) => Ok(room_id),
-        RoomIdOrAliasId::RoomAliasId(alias) => await!(resolve_alias(client.clone(), alias)),
+        RoomIdOrAliasId::RoomAliasId(alias) => resolve_alias(client.clone(), alias).await,
     }
 }
 
 /// delivers the user ids of all users currently joined in the given room
-async fn room_members<C: Connect + 'static>(
-    client: Client<C>,
+async fn room_members(
+    client: HttpsClient,
     room_id: RoomId,
 ) -> Result<Vec<String>, ruma_client::Error> {
-    use r0::sync::get_member_events;
-    let response = await!(get_member_events::call(
-        client.clone(),
-        get_member_events::Request {
+    let response = client.request(
+        r0::sync::get_member_events::Request {
             room_id: room_id.clone(),
         }
-    ))?;
+    ).await?;
 
     // in the case of join membership events it's probably always the case that sender is the same user
     // the event relates to, but actually, the state key is the field building the relationship to the user.
     let state_keys = response
         .chunk
         .into_iter()
+        .filter_map(|event_result| event_result.into_result().ok())
         .filter(|event| event.content.membership == MembershipState::Join)
         .map(|event| event.state_key)
         .collect();
     Ok(state_keys)
 }
 
-fn hash(builder: &BuildHasher<Hasher = DefaultHasher>, x: &impl Hash) -> u64 {
+fn hash(builder: &dyn BuildHasher<Hasher = DefaultHasher>, x: &impl Hash) -> u64 {
     let mut hasher = builder.build_hasher();
     x.hash(&mut hasher);
     hasher.finish()
 }
 
-pub async fn crawl<C: Connect + 'static>(
-    client: Client<C>,
+pub async fn crawl(
+    client: HttpsClient,
 ) -> Result<(usize, usize, usize), ruma_client::Error> {
     // * ignore ourself and voyager, as we are in all rooms but silent, so we won't send messages in the simulation
     // * weho.st and disroot.org requested to opt out as whole server, this will lead to an
@@ -397,7 +382,7 @@ pub async fn crawl<C: Connect + 'static>(
     )
     .unwrap();
 
-    let joined_rooms = await!(joined_rooms(client.clone()))?;
+    let joined_rooms = joined_rooms(client.clone()).await?;
     let mut graph: Graph<Node, (), petgraph::Undirected> = Graph::new_undirected();
 
     let mut room_indexes = HashMap::<RoomId, NodeIndex>::new();
@@ -411,16 +396,16 @@ pub async fn crawl<C: Connect + 'static>(
     let rooms_to_crawl = joined_rooms.len();
 
     for room in joined_rooms {
-        await!(Delay::new(ROOM_CRAWL_DELAY)).expect("wait failed");
+        Delay::new(ROOM_CRAWL_DELAY).await.expect("wait failed");
 
         // occasionally this resulted in a bad gateway error
         // could not find the synapse log lines for that, but it's probably due to server overload.
         // redoing it once worked fine.
-        let members = match await!(room_members(client.clone(), room.clone())) {
+        let members = match room_members(client.clone(), room.clone()).await {
             Ok(members) => members,
             Err(e) => {
                 eprintln!("error getting room members: {:?}, retrying once.", e);
-                await!(room_members(client.clone(), room.clone()))?
+                room_members(client.clone(), room.clone()).await?
             },
         };
 
@@ -484,11 +469,11 @@ pub async fn crawl<C: Connect + 'static>(
     Ok((room_indexes.len(), user_indexes.len(), server_indexes.len()))
 }
 
-pub async fn exit_all<C: Connect + 'static>(
-    client: Client<C>,
+pub async fn exit_all(
+    client: HttpsClient,
     control_room: RoomId,
 ) -> Result<(usize, usize), ruma_client::Error> {
-    let joined_rooms = await!(joined_rooms(client.clone()))?;
+    let joined_rooms = joined_rooms(client.clone()).await?;
 
     // ignore control room
     let joined_count = joined_rooms.len() - 1;
@@ -501,8 +486,8 @@ pub async fn exit_all<C: Connect + 'static>(
     // without being a dead member of the federation?
     for room_id in joined_rooms {
         if room_id != control_room {
-            await!(Delay::new(ROOM_CRAWL_DELAY)).expect("wait failed");
-            match await!(leave_and_forget_room(client.clone(), room_id.clone())) {
+            Delay::new(ROOM_CRAWL_DELAY).await.expect("wait failed");
+            match leave_and_forget_room(client.clone(), room_id.clone()).await {
                 Ok(_) => {
                     left_count += 1;
                     eprintln!("Left room: {} ({}/{})", room_id, left_count, joined_count);
@@ -515,8 +500,8 @@ pub async fn exit_all<C: Connect + 'static>(
     Ok((left_count, joined_count))
 }
 
-pub async fn exit<C: Connect + 'static>(
-    client: Client<C>,
+pub async fn exit(
+    client: HttpsClient,
     room_id: RoomId,
 ) -> Result<(), ruma_client::Error> {
     // leaving as well as forgetting so that the server could part the federation for that rooms.
@@ -524,7 +509,7 @@ pub async fn exit<C: Connect + 'static>(
     // kicked from on a later join run.
     // TODO: is leave_and_forget_room enough so that the server can be shut down
     // without being a dead member of the federation?
-    match await!(leave_and_forget_room(client.clone(), room_id.clone())) {
+    match leave_and_forget_room(client.clone(), room_id.clone()).await {
         Ok(_) => {
             eprintln!("Left room: {}", room_id);
             Ok(())
